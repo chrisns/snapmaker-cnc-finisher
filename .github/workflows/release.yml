@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Run tests
+      run: go test -v ./...
+
+    - name: Build binaries
+      run: |
+        # macOS Intel
+        GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o dist/gcode-optimizer-darwin-amd64 ./cmd/gcode-optimizer/
+
+        # macOS ARM (M1/M2)
+        GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o dist/gcode-optimizer-darwin-arm64 ./cmd/gcode-optimizer/
+
+        # Windows
+        GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o dist/gcode-optimizer-windows-amd64.exe ./cmd/gcode-optimizer/
+
+        # Linux
+        GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o dist/gcode-optimizer-linux-amd64 ./cmd/gcode-optimizer/
+
+    - name: Create checksums
+      run: |
+        cd dist
+        sha256sum * > checksums.txt
+        cat checksums.txt
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          dist/gcode-optimizer-darwin-amd64
+          dist/gcode-optimizer-darwin-arm64
+          dist/gcode-optimizer-windows-amd64.exe
+          dist/gcode-optimizer-linux-amd64
+          dist/checksums.txt
+        body: |
+          ## GCode Finishing Pass Optimizer ${{ github.ref_name }}
+
+          ### Installation
+
+          Download the appropriate binary for your platform and make it executable:
+
+          ```bash
+          # macOS Intel
+          chmod +x gcode-optimizer-darwin-amd64
+          sudo mv gcode-optimizer-darwin-amd64 /usr/local/bin/gcode-optimizer
+
+          # macOS ARM (M1/M2)
+          chmod +x gcode-optimizer-darwin-arm64
+          sudo mv gcode-optimizer-darwin-arm64 /usr/local/bin/gcode-optimizer
+
+          # Linux
+          chmod +x gcode-optimizer-linux-amd64
+          sudo mv gcode-optimizer-linux-amd64 /usr/local/bin/gcode-optimizer
+          ```
+
+          ### Usage
+
+          ```bash
+          gcode-optimizer finishing.cnc 1.0 finishing-optimized.cnc
+          ```
+
+          See [README.md](https://github.com/chrisns/snapmaker-cnc-finisher/blob/main/README.md) for full documentation.
+
+          ### Checksums
+
+          Verify your download using SHA256 checksums in `checksums.txt`.
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
