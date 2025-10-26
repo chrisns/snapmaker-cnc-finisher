@@ -1,490 +1,530 @@
 # Data Model: GCode Finishing Pass Optimizer
 
-**Feature**: 001-gcode-finishing-optimizer
+**Phase**: 1 (Design & Contracts)
 **Date**: 2025-10-26
-**Phase**: Phase 1 - Design
+**Purpose**: Define core data structures, relationships, and state transitions
 
-This document defines the core entities, their attributes, relationships, validation rules, and state transitions for the GCode Finishing Pass Optimizer.
+## Core Entities
 
----
+### 1. ModalState
 
-## Entity Diagram
+**Description**: Tracks current position and parameter values throughout GCode file processing. In GCode, coordinates and parameters not explicitly specified in a command persist from previous commands (modal programming).
 
-```
-┌─────────────────────┐
-│   GCodeFile         │
-├─────────────────────┤
-│ - Path              │
-│ - Header            │
-│ - Lines []Line      │
-│ - Metadata          │
-└──────┬──────────────┘
-       │
-       │ contains *
-       ▼
-┌─────────────────────┐         ┌──────────────────┐
-│   Line              │────────>│  Command         │
-├─────────────────────┤ has *   ├──────────────────┤
-│ - Number            │         │ - Type           │
-│ - Raw               │         │ - Letter         │
-│ - Commands []Cmd    │         │ - Value          │
-│ - Comment           │         │ - Comment        │
-│ - IsFiltered        │         └──────────────────┘
-└─────────────────────┘
-       │
-       │ updates
-       ▼
-┌─────────────────────┐
-│   Statistics        │
-├─────────────────────┤
-│ - TotalLines        │
-│ - ProcessedLines    │
-│ - RemovedLines      │
-│ - BytesIn           │
-│ - BytesOut          │
-│ - TimeSaved         │
-└─────────────────────┘
-```
-
----
-
-## Entity 1: GCodeFile
-
-Represents a GCode CNC file (input or output).
-
-### Attributes
-
-| Name | Type | Description | Constraints | Default |
-|------|------|-------------|-------------|---------|
-| `Path` | `string` | Absolute file path | Non-empty, valid path | - |
-| `Header` | `FileHeader` | Parsed header metadata | - | - |
-| `Metadata` | `FileMetadata` | File statistics | - | Auto-calculated |
-
-### Relationships
-
-- **Contains** 0..* `Line` entities (streaming, not loaded into memory)
-
-### Validation Rules
-
-- `Path` MUST exist (for input files) or be writable (for output files)
-- `Path` MUST have `.cnc`, `.gcode`, or `.nc` extension (warning if not)
-- File size MUST be < 10GB (practical limit per SC-006)
-
-### State Transitions
-
-```
-[Unopened] --Open()--> [Reading] --Parse()--> [Parsed] --Close()--> [Closed]
-                             |
-                             +--Error()--> [Error]
-```
-
----
-
-## Entity 2: FileHeader
-
-Snapmaker Luban GCode header metadata.
-
-### Attributes
-
-| Name | Type | Description | Constraints | Default |
-|------|------|-------------|-------------|---------|
-| `MinZ` | `*float64` | Minimum Z-axis value (mm) | Nullable | nil |
-| `MaxZ` | `*float64` | Maximum Z-axis value (mm) | Nullable | nil |
-| `AxisConfig` | `AxisConfig` | 3-axis or 4-axis CNC | Enum: `Axis3`, `Axis4` | `Axis3` |
-| `ZReference` | `ZReferenceMethod` | How Z=0 was determined | Enum (see below) | `ZRefMaterialSurface` |
-| `Comments` | `[]string` | Header comment lines | - | Empty slice |
-
-### Enumerations
-
-**AxisConfig**:
-- `Axis3` - X, Y, Z axes
-- `Axis4` - X, Y, Z, B axes (rotary)
-
-**ZReferenceMethod** (per FR-004):
-- `ZRefHeaderMetadata` - Detected from header `min_z`/`max_z` fields
-- `ZRefMachineOrigin` - Fallback to machine work origin interpretation
-- `ZRefMaterialSurface` - Final fallback (Z=0 = top of material)
-
-### Validation Rules
-
-- If `MinZ` and `MaxZ` both present, `MinZ` MUST be ≤ `MaxZ`
-- `AxisConfig` MUST be detected from presence of "B" commands in file
-
-### Parsing Logic
-
-```
-1. Scan first 50 lines for comments starting with ";"
-2. Extract ";MIN_Z:<value>" and ";MAX_Z:<value>" if present
-3. Detect axis config from first occurrence of "B<value>" command
-4. Set ZReference based on detection success:
-   - If MinZ/MaxZ found → ZRefHeaderMetadata
-   - Else if work origin heuristics apply → ZRefMachineOrigin
-   - Else → ZRefMaterialSurface (default)
-5. Log ZReference method to console (per FR-004)
-```
-
----
-
-## Entity 3: Line
-
-Represents a single line from the GCode file.
-
-### Attributes
-
-| Name | Type | Description | Constraints | Default |
-|------|------|-------------|-------------|---------|
-| `Number` | `int` | Line number (1-indexed) | > 0 | - |
-| `Raw` | `string` | Original line text | - | - |
-| `Commands` | `[]Command` | Parsed GCode commands | 0..* | Empty |
-| `Comment` | `string` | Inline comment (if any) | - | "" |
-| `IsFiltered` | `bool` | Removed by optimizer | - | false |
-
-### Relationships
-
-- **Has** 0..* `Command` entities (parsed from `Raw`)
-
-### Validation Rules
-
-- `Raw` length MUST be < 2048 characters (GCode convention)
-- `Number` MUST increment sequentially (if validated)
-
-### State Transitions
-
-```
-[Unparsed] --Parse()--> [Parsed] --Filter()--> [Filtered/Retained]
-                             |
-                             +--Error()--> [ParseError]
-```
-
-### Lifecycle
-
-Lines are **not** stored in memory. They are:
-1. Read via `bufio.Scanner`
-2. Parsed into `Command` list
-3. Evaluated for filtering
-4. Written to output (if retained)
-5. Discarded
-
-Only `Statistics` are retained in memory.
-
----
-
-## Entity 4: Command
-
-Represents a single GCode command (e.g., "G1", "X10.5", "F1500").
-
-### Attributes
-
-| Name | Type | Description | Constraints | Default |
-|------|------|-------------|-------------|---------|
-| `Letter` | `string` | Command letter (G, M, X, Y, Z, B, F, etc.) | Single uppercase letter | - |
-| `Value` | `float64` | Numeric parameter | - | 0.0 |
-| `Comment` | `string` | Inline comment (empty if none) | - | "" |
-
-### Validation Rules
-
-- `Letter` MUST be single uppercase letter (A-Z)
-- Common letters: G, M (machine codes), X, Y, Z, B (axes), F (feed rate), S (spindle speed)
-
-### Command Types
-
-Derived from `Letter` + `Value` combination:
-
-| Type | Letter | Example | Description |
-|------|--------|---------|-------------|
-| **Rapid Move** | G | `G0` | Non-cutting rapid positioning |
-| **Linear Move** | G | `G1` | Cutting move with feed rate |
-| **Machine Code** | M | `M3`, `M5` | Spindle on/off, coolant, etc. |
-| **Coordinate** | X/Y/Z/B | `X10.5` | Axis position |
-| **Feed Rate** | F | `F1500` | Cutting speed (mm/min) |
-| **Comment** | ; | `;comment` | Not a command (handled separately) |
-
-### Filtering Logic
-
-A `Line` is **removed** if:
-1. It contains a `G1` command (cutting move), AND
-2. Its `Z` coordinate value is **shallower** than `allowance` threshold, AND
-3. Multi-axis strategy rules apply (see Strategy enum below)
-
-A `Line` is **preserved** if:
-- It contains `G0` (rapid move) - per edge case
-- It contains `M` codes (machine commands) - per FR-006
-- It is a comment line - per FR-006
-- Its `Z` depth exceeds `allowance` (requires material removal)
-
----
-
-## Entity 5: Statistics
-
-Tracks optimization results.
-
-### Attributes
-
-| Name | Type | Description | Constraints | Default |
-|------|------|-------------|-------------|---------|
-| `TotalLines` | `int` | Lines in input file | ≥ 0 | 0 |
-| `ProcessedLines` | `int` | Lines processed so far | ≤ TotalLines | 0 |
-| `RemovedLines` | `int` | Lines filtered out | ≤ TotalLines | 0 |
-| `RetainedLines` | `int` | Lines written to output | = TotalLines - RemovedLines | 0 |
-| `BytesIn` | `int64` | Input file size (bytes) | ≥ 0 | 0 |
-| `BytesOut` | `int64` | Output file size (bytes) | ≥ 0 | 0 |
-| `EstimatedTimeSaved` | `time.Duration` | Calculated time savings | ≥ 0 | 0 |
-| `StartTime` | `time.Time` | Processing start | - | - |
-| `EndTime` | `time.Time` | Processing end | ≥ StartTime | - |
-
-### Derived Fields
-
-| Name | Type | Formula |
-|------|------|---------|
-| `PercentageRemoved` | `float64` | `(RemovedLines / TotalLines) * 100` |
-| `PercentageReduction` | `float64` | `((BytesIn - BytesOut) / BytesIn) * 100` |
-| `ProcessingDuration` | `time.Duration` | `EndTime - StartTime` |
-
-### Validation Rules
-
-- `RemovedLines + RetainedLines` MUST equal `TotalLines`
-- `BytesOut` SHOULD be ≤ `BytesIn` (optimizer never increases size)
-- `EstimatedTimeSaved` calculation per FR-010: sum of `distance ÷ feedRate` for each removed `G1` move
-
-### Time Savings Calculation
-
-For each **removed** `G1` line:
-```
-distance = sqrt((ΔX)² + (ΔY)² + (ΔZ)² + (ΔB)²)  # Euclidean distance
-feedRate = F value (mm/min) from command or previous line
-timeSaved = distance / feedRate  # in minutes
-```
-
-Accumulate across all removed lines.
-
-**Edge Cases**:
-- If `F` not specified on line, use last known feed rate from previous lines
-- If no feed rate ever specified (malformed file), assume 1000 mm/min (log warning)
-
----
-
-## Entity 6: FilterStrategy
-
-Enum defining how multi-axis moves are handled when only Z exceeds allowance.
-
-### Enum Values
-
-| Value | Description | Behavior |
-|-------|-------------|----------|
-| `StrategySafe` | **Default** - Conservative | Preserve entire move if Z-axis component exceeds threshold |
-| `StrategyAllAxes` | All-axes check | Preserve only if **all** axes indicate finishing work (beyond allowance) |
-| `StrategySplit` | Decomposition | Attempt to split multi-axis move into single-axis commands |
-| `StrategyAggressive` | Maximum removal | Remove entire move if Z is shallow, even if X/Y/B exceed threshold |
-
-### Mapping to CLI Flag
-
-Command-line `--strategy` flag:
-- `"safe"` → `StrategySafe` (default)
-- `"all-axes"` → `StrategyAllAxes`
-- `"split"` → `StrategySplit`
-- `"aggressive"` → `StrategyAggressive`
-
-### Validation Rules
-
-- Invalid strategy string MUST return error: "Invalid strategy '<value>'. Must be one of: safe, all-axes, split, aggressive"
-
----
-
-## Entity 7: ProgressUpdate
-
-Real-time processing status (per SC-005).
-
-### Attributes
-
-| Name | Type | Description |
-|------|------|-------------|
-| `LinesProcessed` | `int` | Current line count |
-| `PercentComplete` | `float64` | `(LinesProcessed / TotalLines) * 100` |
-| `LinesRemoved` | `int` | Running total of filtered lines |
-| `ElapsedTime` | `time.Duration` | Time since start |
-| `EstimatedTimeRemaining` | `time.Duration` | Projected time to completion |
-
-### Update Frequency
-
-Per SC-005: "Every 10,000 lines processed OR every 2 seconds, whichever is more frequent"
-
+**Fields**:
 ```go
-if lineCount % 10000 == 0 || time.Since(lastUpdate) >= 2*time.Second {
-    reportProgress(...)
+type ModalState struct {
+    X float64  // Current X position (mm)
+    Y float64  // Current Y position (mm)
+    Z float64  // Current Z position/depth (mm, negative = below surface)
+    B float64  // Current B rotation (degrees, 4-axis only)
+    F float64  // Current feed rate (mm/min)
 }
 ```
 
+**Initialization Rules**:
+- **Z**: Initialize from header `max_z` value if present, otherwise `0.0`
+- **X, Y, B**: Initialize to `0.0`
+- **F**: Initialize to `0.0` (will be set by first move command with feed rate)
+
+**Update Behavior**:
+- Only fields present in current GCode command update their values
+- Absent fields retain previous values (modal behavior)
+- Updates occur before move classification/processing
+
+**Validation**:
+- No explicit validation (GCode files may have any coordinate values)
+- Division-by-zero checks occur during move splitting calculations
+
 ---
 
-## Relationships Summary
+### 2. MoveClassification
+
+**Description**: Classification of a G1 cutting move relative to the depth threshold, determines optimization action.
+
+**Enum**:
+```go
+type MoveClassification int
+
+const (
+    Shallow MoveClassification = iota  // Both start and end above threshold → Remove
+    Deep                                // Both start and end below/at threshold → Preserve
+    CrossingEnter                       // Starts above, ends below/at threshold → Split (keep deep portion)
+    CrossingLeave                       // Starts below/at, ends above threshold → Split (keep deep portion)
+    NonCutting                          // Not a G1 command → Preserve as-is
+)
+```
+
+**Classification Logic**:
+```go
+func ClassifyMove(startZ, endZ, threshold float64) MoveClassification {
+    startDeep := startZ <= threshold
+    endDeep := endZ <= threshold
+
+    if !startDeep && !endDeep {
+        return Shallow  // Both points above threshold
+    }
+    if startDeep && endDeep {
+        return Deep  // Both points at/below threshold
+    }
+    if !startDeep && endDeep {
+        return CrossingEnter  // Entering deep zone
+    }
+    return CrossingLeave  // Leaving deep zone
+}
+```
+
+**State Transitions**:
+- No state machine; classification is stateless per-move decision
+- Classification drives optimization action (remove, preserve, split)
+
+---
+
+### 3. OptimizationStrategy
+
+**Description**: Approach for handling moves that cross the depth threshold.
+
+**Enum**:
+```go
+type OptimizationStrategy int
+
+const (
+    Conservative OptimizationStrategy = iota  // Preserve entire crossing moves
+    Aggressive                                // Split crossing moves at threshold
+)
+```
+
+**Strategy Behaviors**:
+
+| Classification | Conservative Action | Aggressive Action |
+|----------------|---------------------|-------------------|
+| Shallow | Remove | Remove |
+| Deep | Preserve | Preserve |
+| CrossingEnter | **Preserve entire move** | **Split at threshold, keep deep portion** |
+| CrossingLeave | **Preserve entire move** | **Split at threshold, keep deep portion** |
+| NonCutting | Preserve | Preserve |
+
+**Selection**:
+- Controlled by `--strategy` CLI flag
+- Default: `Aggressive`
+- Validated at startup against allowed values
+
+---
+
+### 4. IntersectionPoint
+
+**Description**: Calculated intersection of a move with the depth threshold plane.
+
+**Structure**:
+```go
+type IntersectionPoint struct {
+    X float64  // X coordinate at intersection
+    Y float64  // Y coordinate at intersection
+    Z float64  // Z coordinate (equals threshold exactly)
+    T float64  // Parametric parameter (0 < t < 1)
+}
+```
+
+**Calculation**: See spec.md FR-013 for authoritative parametric linear interpolation formula. Implementation follows the exact algorithm specified in requirements:
+
+1. Calculate intersection parameter: `t = (threshold - Z_start) / (Z_end - Z_start)`
+2. Calculate intersection point: `X₀ = X_start + t(X_end - X_start)`, `Y₀ = Y_start + t(Y_end - Y_start)`, `Z₀ = threshold`
+3. Validate `0 < t < 1` (indicates move crosses threshold within segment)
+4. Handle edge case: `deltaZ ≈ 0` (horizontal move, does not cross threshold vertically)
+
+**Precision**:
+- Coordinates formatted to 3-4 decimal places per spec FR-013
+- Use `fmt.Sprintf("%.4f", value)` for output
+
+**Edge Cases**:
+- `deltaZ ≈ 0`: Move doesn't cross threshold vertically (classify as Shallow or Deep based on Z value)
+- `t < 0` or `t > 1`: Shouldn't occur if classification is correct; return error for debugging
+
+---
+
+### 5. OptimizationResult
+
+**Description**: Statistics and metrics from optimization process.
+
+**Structure**:
+```go
+type OptimizationResult struct {
+    // Input metrics
+    TotalInputLines   int64
+    InputFileSizeBytes int64
+
+    // Processing metrics
+    LinesProcessed    int64
+    LinesRemoved      int64
+    LinesPreserved    int64
+    LinesSplit        int64  // Number of moves that were split (aggressive mode)
+
+    // Depth analysis
+    MinZ              float64  // Minimum Z value found in file
+    Threshold         float64  // Calculated threshold (min_z + allowance)
+
+    // Output metrics
+    TotalOutputLines   int64
+    OutputFileSizeBytes int64
+    ReductionPercent   float64  // (LinesRemoved / TotalInputLines) * 100
+
+    // Time savings estimate
+    EstimatedTimeSavingsSec float64  // Sum of (distance / feed_rate) for removed moves
+
+    // Performance
+    ProcessingDurationSec float64
+    LinesPerSecond       float64
+}
+```
+
+**Calculation Rules**:
+- **ReductionPercent**: `(LinesRemoved / TotalInputLines) × 100`
+- **EstimatedTimeSavingsSec**: For each removed G1 move, calculate:
+  ```
+  distance = sqrt((Δx)² + (Δy)² + (Δz)²)
+  time_sec = (distance / feed_rate_mm_per_min) * 60
+  total = sum(time_sec for all removed moves)
+  ```
+- **LinesPerSecond**: `TotalInputLines / ProcessingDurationSec`
+
+**Display Format** (Console Output):
+```
+Optimization Complete
+━━━━━━━━━━━━━━━━━━━━
+Depth Analysis:
+  Min Z: -12.037mm
+  Threshold: -11.037mm (1.0mm allowance)
+
+Processing Summary:
+  Total lines: 8,233,531
+  Lines removed: 3,127,845 (38.0%)
+  Lines preserved: 5,105,686
+  Moves split: 1,234 (aggressive strategy)
+
+Output:
+  File size: 412.3 MB → 255.1 MB (38.1% reduction)
+  Estimated time savings: 142.5 minutes
+
+Performance:
+  Processing time: 6.3 seconds
+  Throughput: 1,306,908 lines/sec
+```
+
+---
+
+### 6. HeaderMetadata
+
+**Description**: Parsed Snapmaker Luban header information.
+
+**Structure**:
+```go
+type HeaderMetadata struct {
+    FileType        string   // e.g., "cnc"
+    ToolHead        string   // e.g., "standardCNCToolheadForSM2"
+    Machine         string   // e.g., "Snapmaker 2.0 A350"
+    TotalLines      int64    // file_total_lines
+    EstimatedTimeSec float64 // estimated_time(s)
+    IsRotate        bool     // is_rotate (4-axis detection)
+
+    // Bounding box
+    MaxX, MinX float64
+    MaxY, MinY float64
+    MaxZ, MinZ float64
+    MaxB, MinB float64  // Rotation axis (if is_rotate)
+
+    // Other
+    WorkSpeed int  // work_speed(mm/minute)
+    JogSpeed  int  // jog_speed(mm/minute)
+}
+```
+
+**Parsing Rules**:
+- Header lines start with `;` (comment character in GCode)
+- Format: `;key: value` or `;key(unit): value`
+- Examples from freya.cnc:
+  ```
+  ;min_z(mm): -12.037
+  ;max_z(mm): 97.5
+  ;is_rotate: true
+  ;file_total_lines: 8233531
+  ```
+
+**Usage**:
+- **Initial Modal State**: Use `max_z` for Z initialization
+- **4-Axis Detection**: Use `is_rotate` to determine if B axis tracking needed
+- **Progress ETA**: Use `file_total_lines` for accurate progress percentage
+- **Validation Warning**: Check for `tool_head` containing "CNC" to confirm file type
+
+**Validation** (Spec FR-002):
+- If header missing or malformed: Issue console warning, proceed if file is parseable
+- Missing `max_z`: Default to `0.0` for Z initialization
+- Missing `file_total_lines`: Progress display without ETA
+
+---
+
+## Relationships
+
+### Entity Relationship Diagram
 
 ```
-GCodeFile (1) --contains--> (*) Line
-Line (1) --has--> (*) Command
-Line (*) --updates--> (1) Statistics
-FilterStrategy (1) --applies to--> (*) Line
-ProgressUpdate (*) --aggregates--> (1) Statistics
+┌─────────────────┐
+│ HeaderMetadata  │────┐
+└─────────────────┘    │
+                       │ Initializes
+                       ▼
+                 ┌─────────────┐
+                 │ ModalState  │
+                 └─────────────┘
+                       │
+                       │ Tracks position for
+                       ▼
+          ┌──────────────────────────┐
+          │ Move (G1 command)        │
+          └──────────────────────────┘
+                       │
+                       │ Classified by
+                       ▼
+            ┌─────────────────────────┐
+            │ MoveClassification      │
+            └─────────────────────────┘
+                       │
+            ┌──────────┴───────────┐
+            │                      │
+            ▼                      ▼
+   ┌────────────────┐     ┌────────────────────┐
+   │ Shallow/Deep   │     │ CrossingEnter/Leave│
+   │ (Simple action)│     └────────────────────┘
+   └────────────────┘              │
+                                   │ If Aggressive
+                                   ▼
+                         ┌─────────────────────┐
+                         │ IntersectionPoint   │
+                         └─────────────────────┘
+                                   │
+                                   │ Generates
+                                   ▼
+                         ┌─────────────────────┐
+                         │ Split Move Commands │
+                         └─────────────────────┘
 ```
+
+---
+
+## State Transitions
+
+### File Processing State Machine
+
+```
+┌─────────┐
+│  START  │
+└────┬────┘
+     │
+     ▼
+┌─────────────────────┐
+│ Parse Header        │
+│ Extract metadata    │
+└────┬────────────────┘
+     │
+     ▼
+┌─────────────────────┐
+│ Initialize          │
+│ ModalState from     │
+│ header (max_z → Z)  │
+└────┬────────────────┘
+     │
+     ▼
+┌─────────────────────┐
+│ First Pass:         │
+│ Scan for min_z      │──────┐ Calculate threshold
+└────┬────────────────┘      │ (min_z + allowance)
+     │                        │
+     │◄───────────────────────┘
+     ▼
+┌─────────────────────┐
+│ Second Pass:        │
+│ Process each line   │──────┐
+└────┬────────────────┘      │
+     │                        │
+     │  For each line:        │
+     │  ┌──────────────────┐  │
+     │  │ Update ModalState│  │
+     │  └──────┬───────────┘  │
+     │         │              │
+     │         ▼              │
+     │  ┌──────────────────┐  │
+     │  │ Classify Move    │  │
+     │  └──────┬───────────┘  │
+     │         │              │
+     │         ▼              │
+     │  ┌──────────────────┐  │
+     │  │ Apply Strategy   │  │
+     │  │ (Remove/Preserve/│  │
+     │  │  Split)          │  │
+     │  └──────┬───────────┘  │
+     │         │              │
+     │         ▼              │
+     │  ┌──────────────────┐  │
+     │  │ Write to Output  │  │
+     │  └──────────────────┘  │
+     │                        │
+     │◄───────────────────────┘
+     │
+     ▼
+┌─────────────────────┐
+│ Calculate Stats     │
+│ Display Results     │
+└────┬────────────────┘
+     │
+     ▼
+┌─────────┐
+│   END   │
+└─────────┘
+```
+
+### Move Processing Decision Tree
+
+```
+                      ┌──────────────┐
+                      │ GCode Line   │
+                      └──────┬───────┘
+                             │
+                             ▼
+                      ┌──────────────┐
+                      │ Is G1 move?  │
+                      └──┬───────┬───┘
+                 No      │       │      Yes
+            ┌────────────┘       └────────────┐
+            │                                  │
+            ▼                                  ▼
+    ┌──────────────┐                  ┌──────────────────┐
+    │ Preserve as-is│                  │ Update ModalState│
+    └───────────────┘                  └────────┬─────────┘
+                                                │
+                                                ▼
+                                       ┌─────────────────┐
+                                       │ Classify Move   │
+                                       └────┬────────────┘
+                          ┌──────────┬──────┴───────┬────────────┐
+                          │          │              │            │
+                          ▼          ▼              ▼            ▼
+                   ┌──────────┐ ┌────────┐  ┌─────────────┐ ┌─────────────┐
+                   │ Shallow  │ │  Deep  │  │CrossingEnter│ │CrossingLeave│
+                   └────┬─────┘ └───┬────┘  └──────┬──────┘ └──────┬──────┘
+                        │           │              │               │
+                        ▼           ▼              │               │
+                   ┌────────┐  ┌─────────┐         │               │
+                   │ Remove │  │Preserve │         │               │
+                   └────────┘  └─────────┘         │               │
+                                                   │               │
+                                    ┌──────────────┴───────────────┘
+                                    │
+                                    ▼
+                             ┌──────────────┐
+                             │ Check Strategy│
+                             └──┬────────┬───┘
+                       Conservative│    │Aggressive
+                                   │    │
+                        ┌──────────┘    └──────────┐
+                        │                          │
+                        ▼                          ▼
+                  ┌──────────┐            ┌──────────────────┐
+                  │ Preserve │            │ Calculate        │
+                  │ Entire   │            │ IntersectionPoint│
+                  │ Move     │            └────────┬─────────┘
+                  └──────────┘                     │
+                                                   ▼
+                                          ┌────────────────┐
+                                          │ Split Move:    │
+                                          │ - G1 to inter. │
+                                          │ - G1 from inter│
+                                          └────────────────┘
+```
+
+---
+
+## Validation Rules
+
+### Input Validation
+
+| Field | Rule | Error Message |
+|-------|------|---------------|
+| Input File Path | Must exist and be readable | `Error: Input file not found: <path>` |
+| Allowance | Must be numeric and ≥ 0 | `Error: Allowance must be a non-negative number, got: <value>` |
+| Output File Path | Parent directory must exist | `Error: Output directory does not exist: <parent>` |
+| Output File (existing) | Prompt for confirmation unless `--force` | `Output file exists. Overwrite? (y/n)` |
+| Strategy Flag | Must be "conservative" or "aggressive" | `Invalid strategy '<value>'. Valid options are: conservative, aggressive` |
+
+### Processing Validation
+
+| Check | Condition | Action |
+|-------|-----------|--------|
+| Header Validation | Missing or malformed Snapmaker header | Console warning, proceed if parseable |
+| No G1 Moves | File contains no G1 commands with Z coordinates | Warning: "No cutting moves found, output will be identical to input" |
+| Threshold Outside Range | `threshold > max_z` (allowance too large) | Warning: "Threshold above maximum Z, most moves will be removed" |
+| Division by Zero | `end.Z == start.Z` during split | Classify as Shallow or Deep based on Z value, don't split |
+| Out-of-Range t | `t ≤ 0` or `t ≥ 1` during intersection | Error (indicates classification bug), preserve move as fallback |
 
 ---
 
 ## Data Flow
 
+### End-to-End Processing
+
 ```
-1. [Input] GCodeFile opened → FileHeader parsed
-2. [Streaming] For each Line:
-   a. Parse into Commands
-   b. Extract Z coordinate (if G1 command)
-   c. Compare Z vs. Allowance + apply FilterStrategy
-   d. If retained: write to Output
-   e. If filtered: update Statistics.RemovedLines, accumulate TimeSaved
-   f. Update Statistics.ProcessedLines
-   g. Emit ProgressUpdate (if frequency threshold met)
-3. [Finalize] Close Output, calculate final Statistics, display summary
-```
-
----
-
-## Persistence
-
-**File System Only**:
-- Input GCode file: read-only
-- Output GCode file: write-only
-- No database, no configuration files
-
-**In-Memory State**:
-- `Statistics` - single instance
-- `FileHeader` - single instance
-- Current `Line` and `Commands` - transient (garbage collected after processing)
-
----
-
-## Validation Summary
-
-| Entity | Required Fields | Constraints | Error Handling |
-|--------|-----------------|-------------|----------------|
-| GCodeFile | Path | File exists (input), writable (output) | Return error with clear message |
-| FileHeader | AxisConfig | Valid enum | Default to Axis3, log warning |
-| Line | Number, Raw | Number > 0, Raw < 2048 chars | Skip malformed lines, log warning |
-| Command | Letter, Value | Letter in A-Z, Value is float | Parse error → skip line, log warning |
-| Statistics | All fields | Arithmetic consistency | Internal validation, panic if violated |
-| FilterStrategy | - | Valid enum value | Return error if invalid CLI flag |
-
----
-
-## Example Instances
-
-### Example 1: Simple G1 Command Line
-
-**Raw Line**: `G1 X10.5 Y20.3 Z-0.5 F1500`
-
-**Parsed Structure**:
-```go
-Line{
-    Number: 42,
-    Raw: "G1 X10.5 Y20.3 Z-0.5 F1500",
-    Commands: []Command{
-        {Letter: "G", Value: 1.0, Comment: ""},
-        {Letter: "X", Value: 10.5, Comment: ""},
-        {Letter: "Y", Value: 20.3, Comment: ""},
-        {Letter: "Z", Value: -0.5, Comment: ""},
-        {Letter: "F", Value: 1500.0, Comment: ""},
-    },
-    Comment: "",
-    IsFiltered: false,  // Depends on allowance threshold
-}
-```
-
-**Filtering Decision** (assuming allowance = 1.0mm):
-- Z = -0.5mm (absolute value 0.5mm)
-- 0.5mm < 1.0mm → **Line is FILTERED** (shallow cut already handled by rough pass)
-
-### Example 2: Comment Line
-
-**Raw Line**: `; Set spindle speed to 12000 RPM`
-
-**Parsed Structure**:
-```go
-Line{
-    Number: 10,
-    Raw: "; Set spindle speed to 12000 RPM",
-    Commands: []Command{},
-    Comment: " Set spindle speed to 12000 RPM",
-    IsFiltered: false,  // Always retained per FR-006
-}
-```
-
-### Example 3: Rapid Move
-
-**Raw Line**: `G0 Z5.0`
-
-**Parsed Structure**:
-```go
-Line{
-    Number: 15,
-    Raw: "G0 Z5.0",
-    Commands: []Command{
-        {Letter: "G", Value: 0.0, Comment: ""},
-        {Letter: "Z", Value: 5.0, Comment: ""},
-    },
-    Comment: "",
-    IsFiltered: false,  // G0 always retained (edge case rule)
-}
+Input File (freya.cnc)
+         │
+         ▼
+   ┌─────────────┐
+   │ Parse Header│
+   └──────┬──────┘
+          │ HeaderMetadata
+          ▼
+   ┌──────────────────┐
+   │ Initialize State │
+   └──────┬───────────┘
+          │ ModalState (Z from max_z)
+          ▼
+   ┌──────────────────┐
+   │ First Pass:      │
+   │ Find min_z       │
+   └──────┬───────────┘
+          │ min_z = -12.037
+          │ allowance = 1.0
+          │ threshold = -11.037
+          ▼
+   ┌──────────────────┐
+   │ Second Pass:     │
+   │ Process Lines    │
+   └──────┬───────────┘
+          │
+          │ For each line:
+          │   - Update ModalState
+          │   - Classify Move
+          │   - Apply Strategy
+          │   - Accumulate Stats
+          ▼
+   ┌──────────────────┐
+   │ Write Output     │
+   └──────┬───────────┘
+          │ Optimized GCode
+          ▼
+   ┌──────────────────┐
+   │ Display Results  │
+   └──────────────────┘
+          │ OptimizationResult
+          ▼
+    Output File (freya-opt.cnc)
 ```
 
 ---
 
-## State Machine: Line Processing
+## Next Steps (Contracts & Quickstart)
 
-```
-          ┌─────────┐
-          │  Start  │
-          └────┬────┘
-               │
-               ▼
-      ┌────────────────┐
-      │  Read Raw Line │
-      └────┬───────────┘
-           │
-           ▼
-    ┌──────────────┐
-    │  Parse Line  │
-    └──┬───────────┘
-       │
-       ├─ Comment? ────> [Retain & Write]
-       │
-       ├─ G0 Rapid? ──> [Retain & Write]
-       │
-       ├─ M-Code? ────> [Retain & Write]
-       │
-       ├─ G1 + Z? ────> ┌─────────────────┐
-       │                 │ Compare Z vs.   │
-       │                 │ Allowance +     │
-       │                 │ Apply Strategy  │
-       │                 └──┬──────────────┘
-       │                    │
-       │                    ├─ Z shallow? ──> [Filter & Skip]
-       │                    │
-       │                    └─ Z deep? ────> [Retain & Write]
-       │
-       └─ Other ──────────> [Retain & Write]
-```
+1. **Contracts** → `contracts/`
+   - This is a CLI tool with no external API
+   - Internal package interfaces documented in code via Go doc comments
+   - No OpenAPI/GraphQL schema needed
 
----
-
-## Test Data Requirements
-
-Per Principle III (TDD), create test fixtures in `tests/testdata/`:
-
-1. **finishing_3axis.cnc** - Standard 3-axis file with mixed depths
-2. **finishing_4axis.cnc** - 4-axis file with B-axis rotary commands
-3. **malformed_header.cnc** - Missing Snapmaker header (triggers warning)
-4. **large_file.cnc** - 1M+ lines to test streaming and progress updates
-5. **all_shallow.cnc** - All cuts < allowance (tests maximum filtering)
-6. **all_deep.cnc** - All cuts > allowance (tests minimal filtering)
-7. **no_feed_rate.cnc** - Missing F values (tests fallback logic)
-
----
-
-**Generated By**: Claude Code (Sonnet 4.5)
-**References**: [spec.md](./spec.md), [research.md](./research.md)
+2. **Quickstart** → `quickstart.md`
+   - Installation (download binary, `go install`)
+   - Basic usage examples
+   - Common workflows

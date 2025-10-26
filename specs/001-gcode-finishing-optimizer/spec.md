@@ -2,7 +2,8 @@
 
 **Feature Branch**: `001-gcode-finishing-optimizer`
 **Created**: 2025-10-26
-**Status**: Draft
+**Status**: Implemented
+**Released**: v1.0.0 (2025-10-26)
 **Input**: User description: "I want a simple go application that will read the gcode cnc files provided that were produced by snapmaker luban. The command should take the arguments of the finishing.cnc file. The first argument is the file to load, the second is the allowance, assume that there has already been a rough cut that has reduced the material to this apart from the last in this case 1mm, so we can reduce any cuts from the gcode that do not address this since we'll just be cutting into air for most the time. The third argument is the output file. It should then create a new gcode file that is a optimised version of the finishing.cnc that skips cutting anything that the roughcut would have already done."
 
 ## Clarifications
@@ -10,10 +11,15 @@
 ### Session 2025-10-26
 
 - Q: Output file conflict resolution - What should happen when the output file already exists? → A: Prompt user for confirmation (interactive mode), but support optional --force flag to overwrite without prompting (for automation/scripting)
-- Q: Z-axis reference point for depth calculations - What is Z=0 reference point? → A: Auto-detect from GCode header metadata (min_z/max_z fields); fallback to machine work origin if header incomplete; final fallback to material surface convention (Z=0 = top surface). Console alerts must show which method was used.
+- Q: How to determine which cuts are needed for finishing? → A: Find the minimum Z value (deepest cut) in the file, then calculate threshold = min_z + allowance. Only preserve cuts at or below this threshold. This ensures we only keep the final material layer that needs finishing, not the upper layers already removed by the rough cut.
 - Q: Estimated time savings calculation method - How should time savings be calculated? → A: Calculate initial estimate by summing machining time of removed G1 moves (distance ÷ feed rate for each move). Tool should support optional user feedback on actual job completion times to refine the estimation algorithm over time.
 - Q: GCode format validation strictness - How strict should Snapmaker Luban format validation be? → A: Validate Snapmaker header presence, issue console warning if missing or malformed, but proceed with processing if the file is still parseable as GCode.
-- Q: Multi-axis move preservation logic - How should multi-axis moves be handled when only Z exceeds allowance? → A: Default to preserving entire move if Z-axis component exceeds threshold (safe). Provide command-line options for alternative strategies: preserve only if all axes indicate finishing work, split moves into single-axis commands, or remove entire move if Z is shallow.
+- Q: How should moves that cross the depth threshold be handled? → A: Split the move at the threshold intersection point using parametric linear interpolation. Preserve only the portion of the move that goes into the finishing zone (Z ≤ threshold). Maintain the original feed rate without adjustment, as feed rate is modal in GCode and applies continuously along the toolpath.
+- Q: Move splitting coordinate calculation edge case - When splitting a G1 move at the threshold intersection point (FR-013), if the starting Z coordinate is not explicitly stated in the GCode line (due to modal programming where Z remains from a previous command), how should the tool determine the start position for interpolation calculations? → A: Track modal state of all coordinates (X, Y, Z, B) throughout file processing and use last known values for any coordinates not explicitly specified in the current command.
+- Q: Strategy flag definition - The scope section mentions an optional "--strategy" flag, but the specification doesn't define what optimization strategies should be supported. What strategies should the tool implement? → A: Support two strategies: "conservative" (only remove moves entirely above threshold) and "aggressive" (remove moves + split threshold-crossing moves as currently specified). Aggressive is the default.
+- Q: Invalid strategy value handling - What should happen when a user provides an invalid value for the --strategy flag (e.g., --strategy=medium or --strategy=xyz)? → A: Reject with error message listing valid options: "Invalid strategy 'xyz'. Valid options are: conservative, aggressive"
+- Q: Initial modal state for coordinates - When the tool starts processing, before encountering the first explicit coordinate values, what should be the initial values for modal state tracking (X, Y, Z, B)? → A: Initialize from header metadata: Z from max_z (or 0 if max_z not in header), X/Y/B default to 0. This ensures correct move calculations even when early G1 commands use modal programming.
+- Q: Should optimization apply to both G0 (rapid positioning) and G1 (linear feed) moves, or only G1 cutting moves? → A: Only optimize G1 cutting moves. G0 rapid positioning moves must be preserved regardless of depth because they position the tool for subsequent cutting operations. Removing G0 moves would eliminate necessary tool positioning, breaking the toolpath. (Clarified in v1.1.0)
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -30,7 +36,7 @@ A CNC operator has completed a rough cut with a 1.0mm allowance and needs to run
 1. **Given** a valid finishing GCode file (produced by Snapmaker Luban) and an allowance value of 1.0mm, **When** the operator runs the optimization command, **Then** an optimized GCode file is created with reduced line count
 2. **Given** a finishing pass with operations at depths shallower than the rough cut allowance, **When** the optimization runs, **Then** those shallow operations are removed from the output
 3. **Given** a 3-axis or 4-axis CNC GCode file, **When** the optimization runs, **Then** the tool correctly identifies the axis configuration and processes depth (Z-axis) commands appropriately
-4. **Given** a 4-axis GCode file with multi-axis moves, **When** the operator specifies different --strategy options, **Then** the tool applies the corresponding multi-axis move preservation logic ('safe', 'all-axes', 'split', or 'aggressive')
+4. **Given** a GCode file with moves that cross the depth threshold, **When** the optimization runs, **Then** the tool splits those moves at the threshold intersection point and preserves only the deep portion that requires finishing
 
 ---
 
@@ -62,8 +68,9 @@ When provided with invalid inputs (non-existent files, invalid allowance values,
 
 1. **Given** a non-existent input file path, **When** the command runs, **Then** a clear error message indicates the file was not found
 2. **Given** an invalid allowance value (negative or non-numeric), **When** the command runs, **Then** an error message explains valid allowance format
-3. **Given** a GCode file with missing or malformed Snapmaker Luban header, **When** optimization attempts, **Then** a console warning is displayed but processing continues if the file is parseable as GCode
-4. **Given** a completely unparseable file (not GCode format), **When** optimization attempts, **Then** an error indicates the file cannot be parsed
+3. **Given** an invalid --strategy flag value (e.g., --strategy=medium), **When** the command runs, **Then** an error message lists the valid strategy options (conservative, aggressive)
+4. **Given** a GCode file with missing or malformed Snapmaker Luban header, **When** optimization attempts, **Then** a console warning is displayed but processing continues if the file is parseable as GCode
+5. **Given** a completely unparseable file (not GCode format), **When** optimization attempts, **Then** an error indicates the file cannot be parsed
 
 ---
 
@@ -73,32 +80,54 @@ When provided with invalid inputs (non-existent files, invalid allowance values,
 - What happens when the finishing pass depth is entirely within the allowance threshold? (Should skip most/all cutting operations)
 - How does the tool handle non-cutting GCode commands (M-codes, comments, header information)? (Should preserve them in output)
 - What happens with rapid moves (G0) vs. cutting moves (G1) at shallow depths? (Should preserve rapid moves even if shallow, only remove cutting moves)
-- How are multi-axis moves handled when only Z is beyond allowance? (Configurable via --strategy flag: 'safe' [default] preserves entire move if Z exceeds threshold; 'all-axes' requires all axes indicate finishing; 'split' attempts single-axis decomposition; 'aggressive' removes if Z is shallow)
+- How are moves handled when they cross the depth threshold? (Depends on strategy: aggressive splits moves using parametric linear interpolation - see FR-013; conservative preserves entire crossing moves - see FR-005)
 - What happens if output file already exists? (Should prompt for confirmation; --force flag allows overwrite without prompting for automation)
-- What happens with extremely large files (millions of lines)? (Should process efficiently with memory-conscious streaming)
+- What happens with extremely large files (millions of lines)? (Should process efficiently with memory-conscious in-memory processing using efficient data structures)
+- What happens when --strategy flag is not specified? (Defaults to aggressive strategy with move splitting enabled)
+- What happens with invalid --strategy flag values? (Tool rejects with error listing valid options: conservative, aggressive)
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: Tool MUST accept exactly three command-line arguments: input file path, allowance value (numeric), and output file path, with optional flags: --force (bypass overwrite confirmation), --strategy (set multi-axis move handling: 'safe' [default], 'all-axes', 'split', 'aggressive'; case-insensitive; invalid values exit with code 1 and display error message)
+- **FR-001**: Tool MUST accept exactly three command-line arguments: input file path, allowance value (numeric), and output file path, with optional flags: --force (bypass overwrite confirmation) and --strategy=<conservative|aggressive> (optimization strategy, default: aggressive)
 - **FR-002**: Tool MUST read and parse GCode files produced by Snapmaker Luban with support for both 3-axis and 4-axis configurations, validating Snapmaker header presence and issuing console warning if missing/malformed while proceeding if file is still parseable
 - **FR-003**: Tool MUST identify the axis configuration (3-axis vs 4-axis) from the GCode file header or command structure
-- **FR-004**: Tool MUST determine Z-axis reference point by: (1) auto-detecting from GCode header metadata (min_z/max_z), (2) falling back to machine work origin interpretation if metadata incomplete, (3) final fallback to material surface convention (Z=0 = top surface). Tool MUST display console alert indicating which method was used. Tool MUST then analyze Z-axis depth commands (G1 Z values) and compare them against the specified allowance threshold using this determined reference point. Z-axis convention: Positive Z increases upward from reference point. "Shallow depth" means the Z-value is greater than (reference_point - allowance). Example: If reference=0 and allowance=1.0mm, only cutting moves with Z ≤ -1.0mm are preserved (moves at Z > -1.0mm are considered shallow and removed).
-- **FR-005**: Tool MUST remove cutting moves (G1 commands with feed rates) that occur at depths shallower than the allowance threshold, with strategy-based handling for multi-axis moves: 'safe' (default) preserves entire move if Z exceeds threshold; 'all-axes' preserves only if all axes indicate finishing work; 'split' attempts to split into single-axis commands; 'aggressive' removes entire move if Z is shallow
+- **FR-004**: Tool MUST scan all G1 commands in the file to determine the minimum Z value (deepest cut). Tool MUST calculate the depth threshold as: **threshold = min_z + allowance**. Example: If the finishing pass cuts from Z=0 down to Z=-10mm with a 1.0mm allowance, then min_z=-10mm and threshold=-9.0mm. Only cutting moves with Z ≤ -9.0mm are preserved (these represent the final 1mm of material that needs finishing). Moves with Z > -9.0mm are shallow (already removed by rough cut) and should be removed or split (see FR-013). Z-axis convention: Negative Z values represent depth below material surface; more negative = deeper cuts. Tool MUST display console message showing detected min_z and calculated threshold.
+- **FR-005**: Tool MUST handle cutting moves (G1 commands) based on their relationship to the depth threshold calculated in FR-004, with behavior determined by the selected strategy (see FR-001):
+  - **Conservative strategy** (--strategy=conservative):
+    - **Both start and end points shallow** (both Z > threshold): Remove entire move
+    - **Both start and end points deep** (both Z ≤ threshold): Preserve entire move
+    - **Move crosses threshold**: Preserve entire move (safer approach, includes some redundant cutting but eliminates risk of split-move errors)
+  - **Aggressive strategy** (--strategy=aggressive, default):
+    - **Both start and end points shallow** (both Z > threshold): Remove entire move
+    - **Both start and end points deep** (both Z ≤ threshold): Preserve entire move
+    - **Move crosses threshold**: Split move at threshold intersection point using parametric linear interpolation (see FR-013)
+  - **Feed rate preservation**: Maintain original feed rate (F parameter) without adjustment when splitting moves (feed rate is modal in GCode and applies continuously)
 - **FR-006**: Tool MUST preserve all non-cutting commands including rapid moves (G0), machine codes (M-codes), header comments, and configuration commands
 - **FR-007**: Tool MUST preserve the original GCode file structure including header information and metadata
 - **FR-008**: Tool MUST write the optimized GCode to the specified output file path, prompting for confirmation if the file exists (see FR-001 for --force flag behavior)
-- **FR-009**: Tool MUST display progress updates to console during processing including lines processed and estimated completion. Progress ETA calculated using: (elapsed_time / lines_processed) × (total_lines - lines_processed). If total line count is unknown (streaming mode), display lines processed without ETA.
+- **FR-009**: Tool MUST display progress updates to console during processing including lines processed and estimated completion. Progress ETA calculated using: (elapsed_time / lines_processed) × (total_lines - lines_processed). If total line count is unavailable in header metadata, display lines processed without ETA.
 - **FR-010**: Tool MUST report final statistics including total lines removed, percentage reduction, file size before/after, and estimated time savings (calculated by summing machining time of removed G1 moves using distance ÷ feed rate formula)
-- **FR-011**: Tool MUST validate all inputs before processing and provide clear error messages for invalid inputs
+- **FR-011**: Tool MUST validate all inputs before processing and provide clear error messages for invalid inputs. Validation includes: file path existence, allowance value (must be numeric and non-negative), and --strategy flag value (must be "conservative" or "aggressive" if specified). Invalid --strategy values MUST produce error message format: "Invalid strategy '<value>'. Valid options are: conservative, aggressive"
 - **FR-012**: Tool MUST handle file I/O errors gracefully with appropriate error messages
+- **FR-013**: For G1 moves that cross the depth threshold when using aggressive strategy, tool MUST split them using parametric linear interpolation:
+  1. **Modal state initialization**: Before processing commands, initialize modal state from header metadata: Z from max_z value in header (or 0 if max_z not present), X/Y/B default to 0. Feed rate (F) initializes to 0 (will be set by first move command).
+  2. **Modal state tracking**: Tool MUST maintain current state of all coordinates (X, Y, Z, B) and parameters (F) throughout file processing. When a coordinate is not explicitly specified in a command, use the last known value from modal state.
+  3. **Calculate intersection parameter**: `t = (threshold - Z_start) / (Z_end - Z_start)` where 0 < t < 1 indicates the move crosses threshold
+  4. **Calculate intersection point**: `X₀ = X_start + t(X_end - X_start)`, `Y₀ = Y_start + t(Y_end - Y_start)`, `Z₀ = threshold`
+  5. **Entering deep zone** (start shallow Z > threshold, end deep Z ≤ threshold): Output move from intersection point to end point only, discarding shallow portion. Example: `G1 X7.5 Y15 Z-9.0 F1000` then `G1 X10 Y20 Z-10`
+  6. **Leaving deep zone** (start deep Z ≤ threshold, end shallow Z > threshold): Output move from start point to intersection point only, discarding shallow portion
+  7. **Coordinate precision**: Maintain 3-4 decimal places for intersection point coordinates
+  8. **Feed rate handling**: Preserve original feed rate without modification (GCode feed rate is modal and continues across split moves)
 
 ### Key Entities
 
 - **GCode File**: Input/output file containing CNC machine instructions with commands, coordinates, and metadata
 - **GCode Command**: Individual instruction line with command type (G0, G1, M3, etc.), coordinates (X, Y, Z, B), and parameters
 - **Cutting Move**: GCode command that performs material removal (typically G1 commands with feed rates and Z-axis depth changes)
+- **Modal State**: Current position and parameter values maintained throughout file processing. In GCode, coordinates and parameters not explicitly specified in a command persist from previous commands. Tool tracks X, Y, Z, B coordinates and F (feed rate) parameter to enable correct move splitting calculations.
+- **Optimization Strategy**: Approach for handling moves that cross the depth threshold. Conservative strategy preserves entire crossing moves (safer, less optimization). Aggressive strategy splits crossing moves at threshold intersection point (maximum time savings, requires precise interpolation).
 - **Allowance Threshold**: Numeric value representing remaining material depth after rough cut (e.g., 1.0mm)
 - **Optimization Statistics**: Data structure tracking lines removed, file size changes, estimated time savings (calculated from removed G1 move distances and feed rates), and processing metrics
 

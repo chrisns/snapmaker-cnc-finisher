@@ -1,502 +1,334 @@
-# Research Report: GCode Finishing Pass Optimizer
+# Research: GCode Finishing Pass Optimizer
 
+**Phase**: 0 (Outline & Research)
 **Date**: 2025-10-26
-**Feature**: 001-gcode-finishing-optimizer
-**Phase**: Phase 0 - Technical Research
+**Purpose**: Resolve technical unknowns and establish best practices for implementation
 
-This document captures exhaustive research conducted per Constitution Principle VI using Context7, WebSearch, and Perplexity to resolve all technical unknowns and inform architectural decisions.
+## Research Questions
 
----
+### Q1: GCode Parsing Library Selection
 
-## Research Methodology
+**Decision**: Use `github.com/256dpi/gcode` v0.3.0
 
-Per Constitution Principle VI, this research employed:
-- **Context7**: Retrieved official documentation for Go libraries (spf13/cobra)
-- **WebSearch**: Gathered current best practices (5 searches covering Go versions, libraries, CLI patterns, file streaming, CI/CD)
-- **Perplexity**: Deep-dive analysis for architectural decision-making (3 queries on CLI frameworks, GCode parsing, Go versions)
+**Rationale**:
+- **Official Go Package**: Well-documented at pkg.go.dev with clear API
+- **Pure Go**: No CGO dependencies, supports static binary distribution (Constitution Principle II)
+- **Proven Functionality**: Provides exactly what we need:
+  - `ParseFile(io.Reader)` for file parsing
+  - `WriteFile(io.Writer, *File)` for output
+  - Structured types: `File`, `Line`, `GCode` with `Letter`, `Value`, `Comment` fields
+  - Modal programming support (coordinates persist across lines)
+- **MIT Licensed**: Compatible with open-source project
+- **Mature**: Published May 2021, stable API
 
----
+**Alternatives Considered**:
+- **Custom parser**: Rejected due to complexity and time investment; GCode syntax is well-defined but has edge cases
+- **github.com/mauroalderete/gcode-core**: More recent but less documented, unclear API stability
 
-## Decision 1: Go Version
+**Implementation Notes**:
+- Library's `GCode` struct uses `float64` for `Value` - perfect for coordinate calculations
+- `ParseLine(string)` available for incremental processing if memory constraints require streaming
+- No built-in filtering - we implement optimization logic, library handles I/O
 
-### Research Question
-What is the latest stable Go version as of October 2025, and which features benefit CLI file processing tools?
-
-### Findings
-
-**Latest Stable Version**: **Go 1.25.3** (released October 13, 2025)
-
-**Key Features for CLI File Processing Tools**:
-
-1. **Performance Enhancements**
-   - Optimized runtime, compiler, and linker → faster builds and execution
-   - DWARF v5 debug information for improved debugging
-
-2. **Modern JSON Handling**
-   - Experimental `encoding/json/v2` package with substantial performance gains
-   - More predictable behavior for encoding/decoding file metadata
-
-3. **Safer Execution**
-   - Stricter nil pointer detection reduces silent bugs
-   - Better panic reporting for file I/O error handling
-   - Bug fixes in `os`, `net/http`, `sync/atomic` packages
-
-4. **Better Tooling**
-   - Smarter `go vet` analyzers detect concurrency bugs (waitgroup misuse)
-   - Local documentation server (`go doc -http`)
-   - Improved memory-leak detection
-
-5. **Container Awareness**
-   - Container-aware `GOMAXPROCS` respects CPU limits in Kubernetes/Docker
-   - Predictable performance in cloud-native deployments
-
-6. **Garbage Collection**
-   - Experimental "Green Tea" GC (GOEXPERIMENT=greenteagc)
-   - 10-40% reduction in GC overhead for memory-intensive programs
-   - Critical for processing 10M-line GCode files
-
-### Decision
-
-**Use Go 1.25.3** as the target language version.
-
-### Rationale
-
-- Latest stable release with backward compatibility
-- GC improvements directly address large file processing requirements (SC-006: 10M lines)
-- Better error handling aligns with comprehensive testing requirements (Principle III)
-- Container awareness supports future Docker/CI deployment scenarios
-- Strong cross-platform support maintained (Principle I)
-
-### Alternatives Considered
-
-- **Go 1.23.x**: Stable but lacks GC improvements and json/v2 package
-- **Go 1.24.x**: Intermediate release; 1.25.3 offers more relevant features
-
-### Sources
-- https://go.dev/doc/devel/release
-- https://go.dev/blog/go1.25
-- https://www.freecodecamp.org/news/what-is-new-in-go/
+**Sources**:
+- https://pkg.go.dev/github.com/256dpi/gcode
+- https://github.com/256dpi/gcode
 
 ---
 
-## Decision 2: CLI Argument Parsing Framework
+### Q2: Modal State Management Pattern
 
-### Research Question
-Should the tool use spf13/cobra or the standard `flag` package for parsing 3 arguments + 2 optional flags (--force, --strategy)?
+**Decision**: Use struct-based state machine with explicit initialization from header metadata
 
-### Findings
+**Rationale**:
+- **GCode Specification**: Coordinates and parameters not specified in a command persist from previous commands (modal programming)
+- **Initialization Strategy**: Read header metadata (max_z, min_z) during parse, initialize modal state before processing commands
+- **Type Safety**: Go struct with `float64` fields for X, Y, Z, B coordinates and F (feed rate) parameter
 
-**Standard Flag Package**:
-- ✅ Zero dependencies (smaller binary)
-- ✅ Part of Go stdlib (guaranteed cross-platform)
-- ✅ Simple for basic flag parsing
-- ❌ No subcommand support
-- ❌ Manual help text generation
-- ❌ Less structured error handling
-
-**spf13/cobra**:
-- ✅ Rich features (subcommands, nested flags, auto-help, shell completion)
-- ✅ Industry standard (Kubernetes, Hugo, GitHub CLI)
-- ✅ Active maintenance (last published Sept 2025)
-- ✅ Clean command structure for future extensibility
-- ❌ External dependency (~minimal binary size increase)
-- ❌ Slightly higher complexity for simple CLIs
-
-**Binary Size Impact**: Context7 documentation shows Cobra adds approximately 1-2MB to binary size (negligible for modern systems).
-
-### Decision
-
-**Use standard `flag` package** (no Cobra).
-
-### Rationale
-
-1. **Simplicity Alignment**: Tool has exactly 3 positional arguments and 2 optional flags. No subcommands planned.
-2. **Constitution Principle V**: "Minimal external dependencies; prefer standard library"
-3. **Static Binary Size**: Cobra adds 1-2MB; while not large, avoiding it keeps binary minimal per Principle II
-4. **Cross-Platform Guarantee**: stdlib `flag` is inherently portable (Principle I)
-5. **Scope Boundaries**: Spec explicitly states "Out of Scope: Batch processing multiple files" - no need for complex command hierarchies
-
-**Implementation Pattern**:
+**Pattern**:
 ```go
-package main
+type ModalState struct {
+    X float64  // Current X position
+    Y float64  // Current Y position
+    Z float64  // Current Z position (initialized from max_z header or 0)
+    B float64  // Current B rotation (4-axis support)
+    F float64  // Current feed rate
+}
 
-import (
-    "flag"
-    "fmt"
-    "os"
+// Update from GCode line
+func (m *ModalState) Update(line gcode.Line) {
+    for _, code := range line.Codes {
+        switch code.Letter {
+        case "X": m.X = code.Value
+        case "Y": m.Y = code.Value
+        case "Z": m.Z = code.Value
+        case "B": m.B = code.Value
+        case "F": m.F = code.Value
+        }
+    }
+}
+```
+
+**Alternatives Considered**:
+- **Map-based state**: Rejected due to lack of type safety and additional lookup overhead
+- **Require explicit coordinates**: Rejected because real GCode files use modal programming heavily (see freya.cnc analysis)
+
+**Sources**:
+- Spec clarification Q&A #2 (modal state tracking)
+- Spec clarification Q&A #5 (initial state from header)
+- Analysis of freya.cnc showing G1 commands without explicit Z coordinates
+
+---
+
+### Q3: Parametric Linear Interpolation for Move Splitting
+
+**Decision**: Standard parametric line equation with explicit threshold intersection calculation
+
+**Rationale**:
+- **Mathematical Foundation**: Parametric form: `P(t) = P_start + t(P_end - P_start)` where `0 ≤ t ≤ 1`
+- **Threshold Intersection**: Solve for `t` where `Z(t) = threshold`:
+  ```
+  threshold = Z_start + t(Z_end - Z_start)
+  t = (threshold - Z_start) / (Z_end - Z_start)
+  ```
+- **Intersection Point**: `(X₀, Y₀, Z₀)` where:
+  - `X₀ = X_start + t(X_end - X_start)`
+  - `Y₀ = Y_start + t(Y_end - Y_start)`
+  - `Z₀ = threshold` (exact, no floating-point drift)
+
+**Edge Cases**:
+- **Division by zero**: If `Z_end == Z_start`, move doesn't cross threshold vertically (check endpoints only)
+- **Out of range t**: If `t < 0` or `t > 1`, move doesn't intersect within segment (shouldn't occur with proper threshold classification)
+- **Precision**: Maintain 3-4 decimal places per spec (use `fmt.Sprintf("%.4f", value)`)
+
+**Alternatives Considered**:
+- **Approximate splitting**: Rejected due to potential toolpath errors
+- **Conservative whole-move preservation**: Implemented as separate strategy option
+
+**Sources**:
+- Spec FR-013 (parametric linear interpolation requirements)
+- Standard computational geometry references
+
+---
+
+### Q4: CLI Argument Parsing Best Practices (Go 1.21)
+
+**Decision**: Use stdlib `flag` package with positional arguments via `flag.Args()`
+
+**Rationale**:
+- **Constitution Compliance**: Minimal dependencies, prefer stdlib (Principle V)
+- **Sufficient Functionality**: Supports named flags (`--force`, `--strategy=aggressive`) and captures remaining arguments
+- **Go 1.21 Compatibility**: Stable API, no changes needed for future Go versions
+- **POSIX-style**: Flags before positional arguments: `./tool --force --strategy=conservative input.cnc 1.0 output.cnc`
+
+**Pattern**:
+```go
+var (
+    force = flag.Bool("force", false, "Overwrite output without confirmation")
+    strategy = flag.String("strategy", "aggressive", "Optimization strategy (conservative|aggressive)")
 )
 
 func main() {
-    force := flag.Bool("force", false, "Overwrite output without confirmation")
-    strategy := flag.String("strategy", "safe", "Multi-axis move handling (safe/all-axes/split/aggressive)")
-
-    flag.Usage = func() {
-        fmt.Fprintf(os.Stderr, "Usage: %s <input.cnc> <allowance> <output.cnc> [OPTIONS]\n", os.Args[0])
-        fmt.Fprintf(os.Stderr, "\nOptional flags:\n")
-        flag.PrintDefaults()
-    }
-
     flag.Parse()
 
-    if flag.NArg() != 3 {
-        flag.Usage()
+    args := flag.Args()
+    if len(args) != 3 {
+        fmt.Fprintf(os.Stderr, "Usage: %s [flags] <input.cnc> <allowance> <output.cnc>\n", os.Args[0])
+        flag.PrintDefaults()
         os.Exit(1)
     }
 
-    inputFile := flag.Arg(0)
-    allowance := flag.Arg(1)  // convert to float64 with error handling
-    outputFile := flag.Arg(2)
+    inputPath := args[0]
+    allowance := parseFloat(args[1])
+    outputPath := args[2]
 
-    // ... implementation
+    // Validate strategy
+    if *strategy != "conservative" && *strategy != "aggressive" {
+        fmt.Fprintf(os.Stderr, "Invalid strategy '%s'. Valid options are: conservative, aggressive\n", *strategy)
+        os.Exit(1)
+    }
 }
 ```
 
-### Alternatives Considered
+**Alternatives Considered**:
+- **Cobra/Viper**: Rejected due to heavy dependencies contradicting constitution
+- **spf13/pflag**: Rejected as stdlib `flag` is sufficient for our use case
+- **Positional-first parsing**: Rejected because Go's `flag` package expects flags before positional args (standard POSIX pattern)
 
-- **Cobra**: Over-engineered for single-command CLI; conflicts with minimal dependency principle
-- **urfave/cli**: Another popular framework, but same concerns as Cobra for this use case
-- **Custom parser**: Reinventing the wheel when stdlib `flag` is sufficient
-
-### Sources
-- Context7: /spf13/cobra documentation
-- Perplexity analysis: CLI framework tradeoffs 2025
+**Sources**:
 - https://pkg.go.dev/flag
+- https://gobyexample.com/command-line-flags
+- Go 1.21 CLI best practices articles (2025 search results)
 
 ---
 
-## Decision 3: GCode Parsing Strategy
+### Q5: Table-Driven Testing Strategy (Go 1.21/1.22+)
 
-### Research Question
-Should the tool use `github.com/256dpi/gcode` library or implement a custom parser for line-based GCode (e.g., "G1 X10.5 Y20.3 Z-1.2 F1500")?
+**Decision**: Use subtests with table-driven pattern, leverage Go 1.22 loop variable scoping
 
-### Findings
+**Rationale**:
+- **Go Community Standard**: Table-driven tests are idiomatic Go (see official Go Wiki)
+- **Test Coverage**: Easily add edge cases, regression tests, and boundary conditions
+- **Parallel Execution**: Subtests can run in parallel with `t.Parallel()`
+- **Go 1.22 Update**: Loop variable scoping fix eliminates need for `tc := tc` pattern
 
-**github.com/256dpi/gcode Library**:
-- ✅ Purpose-built `ParseLine()` function for GCode strings
-- ✅ Structured data model: `Code{Letter string, Value float64, Comment string}`
-- ✅ Handles comments, whitespace, parameter extraction
-- ✅ Actively maintained by experienced contributor (2025)
-- ✅ Community tested (used in CNC/3D printing toolchains)
-- ✅ Extensions: axis offsetting, SVG conversion, comment stripping
-- ⚠️ External dependency
-
-**Alternative: gcode-core**:
-- Deeper model customization (dependency injection, custom validation)
-- More complex API for niche workflows
-- Less widespread adoption
-
-**Custom Parser**:
-- Full control over implementation
-- Reinvents tested edge-case handling
-- High maintenance burden
-- Risk of bugs in parsing logic
-
-### Decision
-
-**Use `github.com/256dpi/gcode` library**.
-
-### Rationale
-
-1. **Correctness Over Reinvention**: Library handles edge cases (inline comments, whitespace variations, parameter formats) already tested in production
-2. **Performance**: Optimized for line-by-line parsing, critical for 100k-10M line files
-3. **Constitution Principle III**: Testing-focused approach benefits from using battle-tested library vs. debugging custom parser
-4. **Maintenance**: Reduces codebase complexity; focus testing on optimization logic, not parsing correctness
-5. **Acceptable Dependency**: Single-purpose library with no transitive dependencies (checked via pkg.go.dev)
-
-**Parsing Pattern from Library**:
+**Pattern**:
 ```go
-import "github.com/256dpi/gcode"
-
-line := "G1 X10.5 Y20.3 Z-1.2 F1500"
-codes, err := gcode.ParseLine(line)
-// codes = []gcode.Code{
-//   {Letter: "G", Value: 1},
-//   {Letter: "X", Value: 10.5},
-//   {Letter: "Y", Value: 20.3},
-//   {Letter: "Z", Value: -1.2},
-//   {Letter: "F", Value: 1500},
-// }
-```
-
-**Validation Against Constitution**:
-- Principle V allows minimal external dependencies; this is a narrow, well-maintained library
-- No CGO required → static binary compatible (Principle II)
-- Cross-platform (pure Go) → Principle I satisfied
-
-### Alternatives Considered
-
-- **Custom regex-based parser**: Fragile, misses edge cases (comments, tabs vs spaces, signed floats)
-- **gcode-core**: Over-engineered for our needs; adds unnecessary abstraction
-- **JavaScript cncjs/gcode-parser**: Wrong language
-
-### Sources
-- https://pkg.go.dev/github.com/256dpi/gcode
-- https://github.com/256dpi/gcode
-- Perplexity analysis: GCode parsing best practices 2025
-
----
-
-## Decision 4: Large File Streaming Strategy
-
-### Research Question
-What are best practices for processing large GCode files (up to 10M lines) in Go without memory issues?
-
-### Findings
-
-**bufio.Scanner Best Practices (2025)**:
-
-1. **When to Use Scanner**:
-   - Line-by-line reading with custom delimiters
-   - Minimizes memory consumption via buffering
-   - Ideal for files exceeding available RAM
-
-2. **Scanner Limitations**:
-   - Default buffer: 64KB max token size
-   - Stops at EOF, I/O errors, or oversized tokens
-   - For more control, use `bufio.Reader` directly
-
-3. **Buffer Size Adjustments**:
-   - `scanner.Buffer(buf, max)` allows custom capacity
-   - GCode lines rarely exceed 1KB; default sufficient
-
-4. **Performance Optimization**:
-   - Buffered I/O reduces system calls (significant for 10M lines)
-   - Process lines as read (streaming) vs. loading entire file
-
-5. **Error Handling**:
-   - Must check `scanner.Err()` after loop
-   - Silent failures occur if error checks skipped
-
-### Decision
-
-**Use `bufio.Scanner` with line-by-line streaming and progress tracking.**
-
-### Rationale
-
-1. **Memory Constraint**: SC-006 requires handling 10M lines without crashes; streaming prevents loading entire file into memory
-2. **Performance Goal**: SC-001 demands <10s for 100k lines; buffering reduces I/O overhead
-3. **Simplicity**: Scanner's line-oriented API matches GCode's line-based structure
-4. **Progress Reporting**: SC-005 requires updates every 10k lines or 2 seconds; streaming enables real-time tracking
-
-**Implementation Pattern**:
-```go
-import (
-    "bufio"
-    "os"
-)
-
-func processGCodeFile(inputPath string, outputPath string, allowance float64) error {
-    inFile, err := os.Open(inputPath)
-    if err != nil {
-        return err
-    }
-    defer inFile.Close()
-
-    outFile, err := os.Create(outputPath)
-    if err != nil {
-        return err
-    }
-    defer outFile.Close()
-
-    scanner := bufio.NewScanner(inFile)
-    writer := bufio.NewWriter(outFile)
-    defer writer.Flush()
-
-    lineCount := 0
-    for scanner.Scan() {
-        lineCount++
-        line := scanner.Text()
-
-        // Parse with github.com/256dpi/gcode
-        // Filter based on allowance
-        // Write to output if not filtered
-
-        if lineCount % 10000 == 0 {
-            reportProgress(lineCount)
-        }
+func TestMoveFiltering(t *testing.T) {
+    tests := []struct {
+        name      string
+        startZ    float64
+        endZ      float64
+        threshold float64
+        want      FilterAction
+    }{
+        {"shallow move above threshold", -5.0, -4.0, -9.0, Remove},
+        {"deep move below threshold", -11.0, -10.0, -9.0, Preserve},
+        {"crossing move entering deep", -8.0, -10.0, -9.0, Split},
+        {"crossing move leaving deep", -10.0, -8.0, -9.0, Split},
+        {"move exactly at threshold start", -9.0, -10.0, -9.0, Preserve},
+        {"move exactly at threshold end", -10.0, -9.0, -9.0, Preserve},
     }
 
-    if err := scanner.Err(); err != nil {
-        return err
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // Go 1.22+: no need for tt := tt
+            got := ClassifyMove(tt.startZ, tt.endZ, tt.threshold)
+            if got != tt.want {
+                t.Errorf("ClassifyMove(%v, %v, %v) = %v, want %v",
+                    tt.startZ, tt.endZ, tt.threshold, got, tt.want)
+            }
+        })
     }
-
-    return nil
 }
 ```
 
-**Buffered Writer**: Output also uses `bufio.NewWriter` to batch writes, reducing system calls.
+**Best Practices Applied**:
+- **Descriptive names**: Test case `name` field for clear failure messages
+- **Independent tests**: Each case runs in isolation
+- **Edge case coverage**: Include boundary conditions, threshold equality, crossing directions
+- **Subtests since Go 1.7**: Better granularity and reporting with `go test -v`
 
-### Alternatives Considered
+**Alternatives Considered**:
+- **Separate test functions**: Rejected due to code duplication
+- **Map-based tables**: Rejected because iteration order is undefined (slice order is stable)
 
-- **os.ReadFile**: Loads entire file into memory; fails on large files (SC-006 violation)
-- **bufio.Reader.ReadString**: More manual control but unnecessary complexity
-- **Memory-mapped I/O**: Overkill for sequential line processing
-
-### Sources
-- https://pkg.go.dev/bufio
-- https://dev.to/moseeh_52/efficient-file-reading-in-go-mastering-bufionewscanner-vs-osreadfile-4h05
-- https://stackoverflow.com/questions/29442006/reading-in-very-large-files
+**Sources**:
+- https://go.dev/wiki/TableDrivenTests
+- https://dave.cheney.net/2019/05/07/prefer-table-driven-tests
+- Go 1.22 release notes (loop variable scoping change)
 
 ---
 
-## Decision 5: Cross-Platform Testing & CI/CD
+### Q6: Progress Reporting and ETA Calculation
 
-### Research Question
-What are best practices for ensuring Go CLI tools work across macOS (Intel/ARM), Windows, and Linux in 2025?
+**Decision**: Use elapsed time ratio with periodic console updates
 
-### Findings
+**Rationale**:
+- **User Requirement**: Spec FR-009 requires progress updates showing lines processed and estimated completion
+- **ETA Formula**: `ETA = (elapsed_time / lines_processed) × (total_lines - lines_processed)`
+- **Update Frequency**: Spec SC-005 requires updates every 10,000 lines OR every 2 seconds (whichever is more frequent)
+- **Streaming Consideration**: If total line count unknown, display lines processed without ETA
 
-**GitHub Actions Matrix Strategy**:
+**Pattern**:
+```go
+type ProgressReporter struct {
+    totalLines    int64
+    processedLines int64
+    startTime     time.Time
+    lastUpdate    time.Time
+}
 
-1. **Matrix Builds**: Run parallel jobs across OS/architecture combinations
-2. **Cartesian Product**: Automatically generates all config permutations
-3. **Parallel Execution**: Reduces total CI time
-4. **Go-Specific Actions**: `actions/setup-go@v5` (2025 version)
+func (p *ProgressReporter) Update(linesProcessed int64) {
+    p.processedLines = linesProcessed
+    now := time.Now()
 
-**Standard Configuration (2025)**:
-```yaml
-strategy:
-  matrix:
-    os: [ubuntu-latest, macos-latest, windows-latest]
-    go-version: ['1.25.3']
+    // Update every 2 seconds or 10k lines
+    if now.Sub(p.lastUpdate) < 2*time.Second && linesProcessed%10000 != 0 {
+        return
+    }
+
+    p.lastUpdate = now
+    elapsed := now.Sub(p.startTime)
+
+    if p.totalLines > 0 {
+        remaining := p.totalLines - p.processedLines
+        eta := time.Duration(float64(elapsed) / float64(p.processedLines) * float64(remaining))
+        fmt.Printf("\rProcessed: %d/%d lines (%.1f%%) - ETA: %s",
+            p.processedLines, p.totalLines,
+            100.0*float64(p.processedLines)/float64(p.totalLines),
+            eta.Round(time.Second))
+    } else {
+        fmt.Printf("\rProcessed: %d lines", p.processedLines)
+    }
+}
 ```
 
-**Concurrency Control**:
-- `cancel-in-progress: true` kills stale jobs on new commits
-- Saves CI minutes and provides faster feedback
+**Alternatives Considered**:
+- **Third-party progress bars**: Rejected to minimize dependencies
+- **Fixed update interval only**: Rejected because spec requires dual criteria (time OR line count)
 
-### Decision
-
-**Use GitHub Actions with matrix strategy across 3 platforms + Go 1.25.3.**
-
-### Rationale
-
-1. **Constitution Principle I**: "Test on all three target platforms before release"
-2. **Constitution Principle IV**: "GitHub Actions MUST automate: linting, testing (all platforms), building (all architectures), releasing"
-3. **Cost-Effective**: GitHub provides free CI minutes for public repos
-4. **Industry Standard**: Matrix builds are standard practice in 2025 for Go projects
-
-**CI Workflow Structure**:
-```yaml
-name: CI
-
-on: [push, pull_request]
-
-jobs:
-  test:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.25.3'
-      - run: go fmt ./...
-      - run: go vet ./...
-      - run: go test -v -race -coverprofile=coverage.out ./...
-```
-
-**Release Workflow** (per Constitution requirements):
-```yaml
-name: Release
-
-on:
-  push:
-    tags:
-      - 'v*'
-
-jobs:
-  release:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.25.3'
-      - name: Build all platforms
-        run: |
-          GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o dist/snapmaker-cnc-finisher-darwin-amd64
-          GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o dist/snapmaker-cnc-finisher-darwin-arm64
-          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o dist/snapmaker-cnc-finisher-windows-amd64.exe
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o dist/snapmaker-cnc-finisher-linux-amd64
-      - uses: softprops/action-gh-release@v1
-        with:
-          files: dist/*
-```
-
-### Alternatives Considered
-
-- **Travis CI**: Declining popularity, less Go-specific tooling
-- **CircleCI**: Requires separate config, less integrated with GitHub
-- **Manual testing**: Violates Constitution Principle IV automation requirement
-
-### Sources
-- https://www.blacksmith.sh/blog/matrix-builds-with-github-actions
-- https://www.dolthub.com/blog/2025-02-14-simple-github-test-ci-with-go/
-- https://github.com/spf13/cobra (reference implementation for CI patterns)
+**Sources**:
+- Spec FR-009, SC-005 (progress requirements)
+- Go stdlib `time` package patterns
 
 ---
 
-## Summary of Architectural Decisions
+### Q7: File I/O and Format Preservation
 
-| Decision Area | Choice | Key Rationale |
-|---------------|--------|---------------|
-| **Go Version** | Go 1.25.3 | Latest stable; GC improvements for large file processing; container awareness |
-| **CLI Framework** | stdlib `flag` | Minimal dependencies per Constitution Principle V; no subcommands needed |
-| **GCode Parsing** | `github.com/256dpi/gcode` | Battle-tested, handles edge cases, pure Go (no CGO) |
-| **File Streaming** | `bufio.Scanner` | Memory-efficient for 10M lines; line-oriented API matches GCode structure |
-| **CI/CD Platform** | GitHub Actions Matrix | Constitution requirement; parallel multi-platform testing; free for OSS |
+**Decision**: Use `gcode` library's WriteFile with original header/comment preservation
 
----
+**Rationale**:
+- **Format Compatibility**: Must preserve Snapmaker Luban header and metadata (spec FR-007)
+- **Library Support**: `gcode.WriteFile(writer, file)` maintains line structure and comments
+- **Streaming Not Required**: Memory-conscious but not mandatory streaming; Go can handle 10M line files in-memory with ~1-2GB RAM
+- **Header Preservation**: Parse header during initial scan, include verbatim in output
 
-## Dependency Audit
+**Implementation Notes**:
+- Read entire file into `*gcode.File` structure
+- Preserve header lines (starting with `;`) exactly as-is
+- Filter/modify only G1 cutting moves based on strategy
+- Preserve all G0 (rapid), M-codes, comments, configuration commands
+- Write output with same formatting
 
-**Direct Dependencies** (approved per Constitution Principle V):
-1. `github.com/256dpi/gcode` - GCode parsing (pure Go, no transitive deps)
+**Memory Estimate**:
+- 10M lines × ~50 bytes/line average = ~500MB raw text
+- Parsed structure overhead: ~200MB
+- Total: ~700MB peak memory for largest expected files (well within modern system limits)
 
-**Standard Library Packages** (zero external dependencies):
-- `bufio` - File streaming
-- `flag` - CLI argument parsing
-- `fmt` - Output formatting
-- `os` - File I/O
-- `strconv` - Numeric conversion (allowance parsing)
-- `path/filepath` - Cross-platform path handling (Principle I)
+**Alternatives Considered**:
+- **Streaming line-by-line**: Rejected as premature optimization; adds complexity without proven need
+- **Custom writer**: Rejected because `gcode.WriteFile` handles formatting correctly
 
-**CGO Status**: `CGO_ENABLED=0` enforced (Constitution Principle II)
-
-**Transitive Dependencies**: None (verified via `go mod graph`)
-
----
-
-## Risk Assessment
-
-### Low Risk
-- ✅ All decisions align with Constitution principles
-- ✅ Single external dependency with no transitive deps
-- ✅ Standard library heavily used (stable, cross-platform)
-- ✅ Community-vetted patterns for file streaming and CI/CD
-
-### Mitigations Implemented
-- **Large file memory risk**: Addressed via `bufio.Scanner` streaming
-- **Cross-platform compatibility**: GitHub Actions matrix testing enforced
-- **Dependency maintenance**: `github.com/256dpi/gcode` actively maintained (2025)
-- **Binary size**: Minimal dependencies keep static binary small
+**Sources**:
+- `gcode` library documentation
+- Spec FR-007 (format preservation), SC-006 (10M line handling)
 
 ---
 
-## Next Steps
+## Summary of Technical Decisions
 
-Phase 0 research complete. Proceed to Phase 1:
-1. Generate `data-model.md` (entities: GCode file, command, statistics)
-2. Generate `contracts/` (if applicable - likely N/A for CLI tool)
-3. Generate `quickstart.md` (installation, usage examples)
-4. Update agent context via `.specify/scripts/bash/update-agent-context.sh`
-5. Re-evaluate Constitution Check post-design
+| Area | Decision | Key Rationale |
+|------|----------|---------------|
+| **Parsing** | `github.com/256dpi/gcode` v0.3.0 | Pure Go, well-documented, stable API |
+| **Modal State** | Struct-based state machine | Type-safe, initialized from header metadata |
+| **Move Splitting** | Parametric linear interpolation | Mathematically accurate, preserves toolpath integrity |
+| **CLI Parsing** | Stdlib `flag` package | Minimal dependencies, sufficient functionality |
+| **Testing** | Table-driven subtests (Go 1.22+) | Idiomatic, comprehensive coverage, parallel-safe |
+| **Progress** | Time-ratio ETA with dual update criteria | Meets spec requirements (2s OR 10k lines) |
+| **File I/O** | In-memory processing with `gcode.WriteFile` | Format preservation, acceptable memory footprint |
 
----
+## Next Steps (Phase 1)
 
-**Research Completed By**: Claude Code (Sonnet 4.5)
-**Constitution Principle VI Compliance**: ✅ Exhaustive research via Context7, WebSearch, Perplexity
-**Citations**: Embedded inline with source URLs throughout document
+1. **Data Model Design** → `data-model.md`
+   - Define `ModalState`, `MoveClassification`, `OptimizationStrategy` types
+   - Specify `OptimizationResult` statistics structure
+
+2. **API Contracts** → `contracts/`
+   - Not applicable (CLI tool, no external API)
+   - Document internal package interfaces instead
+
+3. **Quickstart Guide** → `quickstart.md`
+   - Installation instructions (download binary, go install)
+   - Basic usage examples
+   - Common workflows (rough + finish optimization)
