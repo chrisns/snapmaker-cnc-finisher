@@ -15,6 +15,9 @@ const (
 	ZRefMetadata      ZReference = iota // From GCode header metadata (min_z/max_z)
 	ZRefMachineOrigin                   // Fallback to machine work origin
 	ZRefSurface                         // Fallback to material surface convention (Z=0 = top)
+
+	// HeaderScanLines is the maximum number of lines to scan for metadata
+	HeaderScanLines = 50
 )
 
 // Metadata contains extracted header information from a GCode file
@@ -34,10 +37,9 @@ func ExtractMetadata(r io.Reader) (*Metadata, error) {
 	hasMinZ := false
 	hasMaxZ := false
 	lineCount := 0
-	maxLinesToScan := 50
 
-	// Scan first 50 lines
-	for scanner.Scan() && lineCount < maxLinesToScan {
+	// Scan first N lines for header metadata
+	for scanner.Scan() && lineCount < HeaderScanLines {
 		line := strings.TrimSpace(scanner.Text())
 		lineCount++
 

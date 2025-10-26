@@ -171,6 +171,81 @@ func TestPreserveRapidAndMachineCodes(t *testing.T) {
 	}
 }
 
+func TestFeedRatePreservation(t *testing.T) {
+	tests := []struct {
+		name     string
+		cmd      gcode.Command
+		wantFeed float64
+	}{
+		{
+			name: "G1 cutting move with F1000",
+			cmd: gcode.Command{
+				Letter: "G",
+				Value:  1,
+				Params: map[string]float64{"X": 10.0, "Y": 20.0, "Z": -2.0, "F": 1000.0},
+			},
+			wantFeed: 1000.0,
+		},
+		{
+			name: "G1 cutting move with F1500",
+			cmd: gcode.Command{
+				Letter: "G",
+				Value:  1,
+				Params: map[string]float64{"X": 5.0, "Z": -1.5, "F": 1500.0},
+			},
+			wantFeed: 1500.0,
+		},
+		{
+			name: "G1 cutting move with F500",
+			cmd: gcode.Command{
+				Letter: "G",
+				Value:  1,
+				Params: map[string]float64{"Y": 30.0, "Z": -3.0, "F": 500.0},
+			},
+			wantFeed: 500.0,
+		},
+		{
+			name: "G1 cutting move with high speed F3000",
+			cmd: gcode.Command{
+				Letter: "G",
+				Value:  1,
+				Params: map[string]float64{"X": 100.0, "F": 3000.0},
+			},
+			wantFeed: 3000.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Verify the command preserves its feed rate parameter
+			if feed, ok := tt.cmd.Params["F"]; !ok {
+				t.Error("Command should have feed rate parameter 'F'")
+			} else if feed != tt.wantFeed {
+				t.Errorf("Feed rate = %v, want %v", feed, tt.wantFeed)
+			}
+
+			// Verify that feed rate is part of the command params and not lost during filtering decisions
+			// This ensures that when a move is kept (not filtered), it retains its feed rate
+			meta := &gcode.Metadata{
+				MinZ:       -5.0,
+				MaxZ:       0.0,
+				ZReference: gcode.ZRefMetadata,
+			}
+
+			// These moves should NOT be filtered (deep cuts), so feed rate should be preserved
+			shouldFilter := optimizer.ShouldFilterMove(tt.cmd, 1.0, meta, optimizer.StrategySafe)
+			if shouldFilter {
+				t.Error("Deep cut should not be filtered - feed rate preservation test invalid")
+			}
+
+			// Verify the params map still contains the feed rate after filtering decision
+			if feed, ok := tt.cmd.Params["F"]; !ok || feed != tt.wantFeed {
+				t.Errorf("Feed rate not preserved after filtering decision: got %v, want %v", feed, tt.wantFeed)
+			}
+		})
+	}
+}
+
 func TestShouldFilterMultiAxisMove(t *testing.T) {
 	meta := &gcode.Metadata{
 		MinZ:       -5.0,

@@ -5,14 +5,19 @@ import (
 	"time"
 )
 
+const (
+	// DefaultFeedRate is the default feed rate in mm/min when not specified
+	DefaultFeedRate = 1000.0
+)
+
 // Statistics tracks optimization metrics
 type Statistics struct {
-	TotalLines          int           // Total lines processed
-	RemovedLines        int           // Lines filtered out
-	BytesIn             int64         // Input file size in bytes
-	BytesOut            int64         // Output file size in bytes
-	EstimatedTimeSaved  time.Duration // Estimated machining time saved
-	ProcessingTime      time.Duration // Time spent processing
+	TotalLines         int           // Total lines processed
+	RemovedLines       int           // Lines filtered out
+	BytesIn            int64         // Input file size in bytes
+	BytesOut           int64         // Output file size in bytes
+	EstimatedTimeSaved time.Duration // Estimated machining time saved
+	ProcessingTime     time.Duration // Time spent processing
 }
 
 // NewStatistics creates a new Statistics instance
@@ -57,7 +62,7 @@ func CalculateTimeSaved(x1, y1, z1, x2, y2, z2, feedRate float64) time.Duration 
 
 	// Use default feed rate if invalid
 	if feedRate <= 0 {
-		feedRate = 1000.0 // Default: 1000 mm/min
+		feedRate = DefaultFeedRate
 	}
 
 	// Calculate time: distance (mm) / feed rate (mm/min) = time (min)

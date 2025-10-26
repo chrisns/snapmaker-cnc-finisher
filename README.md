@@ -13,11 +13,45 @@ A Go CLI tool that optimizes Snapmaker Luban finishing pass GCode files by remov
 
 ## Installation
 
-```bash
-# Download the latest release for your platform from:
-# https://github.com/chrisns/snapmaker-cnc-finisher/releases
+### Option 1: Download Pre-Built Binary (Recommended)
 
-# Or build from source:
+Visit the [Releases page](https://github.com/chrisns/snapmaker-cnc-finisher/releases) and download the binary for your platform:
+
+- **macOS Intel**: `snapmaker-cnc-finisher-darwin-amd64`
+- **macOS ARM (M1/M2/M3/M4)**: `snapmaker-cnc-finisher-darwin-arm64`
+- **Windows**: `snapmaker-cnc-finisher-windows-amd64.exe`
+- **Linux**: `snapmaker-cnc-finisher-linux-amd64`
+
+#### Make Executable (macOS/Linux)
+
+```bash
+chmod +x snapmaker-cnc-finisher-*
+```
+
+#### Optional: Add to PATH
+
+**macOS/Linux**:
+```bash
+sudo mv snapmaker-cnc-finisher-* /usr/local/bin/snapmaker-cnc-finisher
+```
+
+**Windows**:
+1. Move the executable to a directory in your PATH (e.g., `C:\Windows\System32`)
+2. Or create a new directory and add it to your PATH environment variable
+
+### Option 2: Build from Source
+
+**Requirements**: Go 1.25.3 or later
+
+```bash
+# Clone the repository
+git clone https://github.com/chrisns/snapmaker-cnc-finisher.git
+cd snapmaker-cnc-finisher
+
+# Build
+CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o snapmaker-cnc-finisher ./cmd/snapmaker-cnc-finisher
+
+# Or install directly
 go install github.com/chrisns/snapmaker-cnc-finisher/cmd/snapmaker-cnc-finisher@latest
 ```
 
@@ -31,7 +65,13 @@ snapmaker-cnc-finisher finishing.cnc 1.0 optimized.cnc
 snapmaker-cnc-finisher finishing.cnc 1.0 optimized.cnc --force
 
 # With custom multi-axis strategy
-snapmaker-cnc-finisher finishing.cnc 1.0 optimized.cnc --strategy aggressive
+snapmaker-cnc-finisher finishing.cnc 1.0 optimized.cnc --strategy=aggressive
+
+# Display help
+snapmaker-cnc-finisher --help
+
+# Show version
+snapmaker-cnc-finisher --version
 ```
 
 ### Arguments
@@ -88,11 +128,75 @@ CGO_ENABLED=0 go build -o snapmaker-cnc-finisher ./cmd/snapmaker-cnc-finisher
 
 ## Contributing
 
-Contributions are welcome! Please ensure:
-- All tests pass (`go test ./...`)
-- Code is formatted (`go fmt ./...`)
-- No linter warnings (`go vet ./...`)
-- 80%+ test coverage maintained
+Contributions are welcome! This project follows Test-Driven Development (TDD) and Go best practices.
+
+### Development Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/chrisns/snapmaker-cnc-finisher.git
+cd snapmaker-cnc-finisher
+
+# Install dependencies
+go mod download
+
+# Run tests
+go test ./...
+
+# Run tests with coverage
+go test ./... -cover
+
+# Run tests with race detector
+go test ./... -race
+
+# Run linter
+go vet ./...
+
+# Format code
+go fmt ./...
+```
+
+### Before Submitting a PR
+
+Please ensure:
+- [ ] All tests pass on all platforms (`go test ./...`)
+- [ ] Code is formatted (`go fmt ./...`)
+- [ ] No linter warnings (`go vet ./...`)
+- [ ] Test coverage is maintained at 80%+ (`go test ./... -cover`)
+- [ ] Documentation is updated if needed
+- [ ] Commit messages follow conventional commit format
+
+### Testing Requirements
+
+- Write tests before implementation (TDD/Red-Green-Refactor)
+- Use table-driven tests where appropriate
+- Ensure tests pass on macOS, Windows, and Linux
+- Target minimum 80% code coverage
+
+### Project Structure
+
+```
+cmd/
+└── snapmaker-cnc-finisher/    # Main CLI entry point
+internal/
+├── gcode/                      # GCode parsing
+├── optimizer/                  # Optimization logic
+└── cli/                        # CLI interface
+tests/
+├── unit/                       # Unit tests
+├── integration/                # Integration tests
+├── contract/                   # Contract tests
+└── testdata/                   # Test fixtures
+```
+
+### Reporting Issues
+
+When reporting issues, please include:
+- Tool version (`snapmaker-cnc-finisher --version`)
+- Operating system and architecture
+- Full error message or unexpected output
+- Sample GCode file (if relevant and possible)
+- Steps to reproduce
 
 ## License
 

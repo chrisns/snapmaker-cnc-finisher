@@ -81,7 +81,7 @@ func TestIsShallowDepth(t *testing.T) {
 				MaxZ:       0.0,
 				ZReference: gcode.ZRefMetadata,
 			},
-			z:         -0.5,  // Above threshold of -0.8 (0 - 0.8)
+			z:         -0.5, // Above threshold of -0.8 (0 - 0.8)
 			allowance: 0.8,
 			want:      true,
 		},
@@ -92,7 +92,7 @@ func TestIsShallowDepth(t *testing.T) {
 				MaxZ:       0.0,
 				ZReference: gcode.ZRefMetadata,
 			},
-			z:         -1.5,  // Below threshold of -0.8 (0 - 0.8)
+			z:         -1.5, // Below threshold of -0.8 (0 - 0.8)
 			allowance: 0.8,
 			want:      false,
 		},
@@ -103,7 +103,7 @@ func TestIsShallowDepth(t *testing.T) {
 				MaxZ:       0.0,
 				ZReference: gcode.ZRefMetadata,
 			},
-			z:         -0.8,  // Exactly at threshold
+			z:         -0.8, // Exactly at threshold
 			allowance: 0.8,
 			want:      false, // Not greater than threshold
 		},
@@ -113,7 +113,7 @@ func TestIsShallowDepth(t *testing.T) {
 				MinZ:       -3.0,
 				ZReference: gcode.ZRefMachineOrigin,
 			},
-			z:         -0.3,  // Above threshold of -0.5 (0 - 0.5)
+			z:         -0.3, // Above threshold of -0.5 (0 - 0.5)
 			allowance: 0.5,
 			want:      true,
 		},
@@ -123,7 +123,7 @@ func TestIsShallowDepth(t *testing.T) {
 				MinZ:       -3.0,
 				ZReference: gcode.ZRefMachineOrigin,
 			},
-			z:         -2.0,  // Below threshold of -0.5 (0 - 0.5)
+			z:         -2.0, // Below threshold of -0.5 (0 - 0.5)
 			allowance: 0.5,
 			want:      false,
 		},
@@ -132,7 +132,7 @@ func TestIsShallowDepth(t *testing.T) {
 			meta: gcode.Metadata{
 				ZReference: gcode.ZRefSurface,
 			},
-			z:         -0.2,  // Above threshold of -1.0 (0 - 1.0)
+			z:         -0.2, // Above threshold of -1.0 (0 - 1.0)
 			allowance: 1.0,
 			want:      true,
 		},
@@ -141,7 +141,7 @@ func TestIsShallowDepth(t *testing.T) {
 			meta: gcode.Metadata{
 				ZReference: gcode.ZRefSurface,
 			},
-			z:         -2.5,  // Below threshold of -1.0 (0 - 1.0)
+			z:         -2.5, // Below threshold of -1.0 (0 - 1.0)
 			allowance: 1.0,
 			want:      false,
 		},
@@ -152,7 +152,7 @@ func TestIsShallowDepth(t *testing.T) {
 				MaxZ:       0.0,
 				ZReference: gcode.ZRefMetadata,
 			},
-			z:         0.1,   // Above threshold of 0 (0 - 0)
+			z:         0.1, // Above threshold of 0 (0 - 0)
 			allowance: 0.0,
 			want:      true,
 		},
@@ -163,7 +163,7 @@ func TestIsShallowDepth(t *testing.T) {
 				MaxZ:       0.0,
 				ZReference: gcode.ZRefMetadata,
 			},
-			z:         0.0,   // Exactly at threshold
+			z:         0.0, // Exactly at threshold
 			allowance: 0.0,
 			want:      false,
 		},
@@ -174,7 +174,7 @@ func TestIsShallowDepth(t *testing.T) {
 				MaxZ:       2.0,
 				ZReference: gcode.ZRefMetadata,
 			},
-			z:         1.5,   // Above threshold of 1.0 (2.0 - 1.0)
+			z:         1.5, // Above threshold of 1.0 (2.0 - 1.0)
 			allowance: 1.0,
 			want:      true,
 		},
@@ -185,7 +185,7 @@ func TestIsShallowDepth(t *testing.T) {
 				MaxZ:       2.0,
 				ZReference: gcode.ZRefMetadata,
 			},
-			z:         0.5,   // Below threshold of 1.0 (2.0 - 1.0)
+			z:         0.5, // Below threshold of 1.0 (2.0 - 1.0)
 			allowance: 1.0,
 			want:      false,
 		},
@@ -207,7 +207,7 @@ func TestIsShallowDepth(t *testing.T) {
 				MaxZ:       0.0,
 				ZReference: gcode.ZRefMetadata,
 			},
-			z:         -3.0,  // Above threshold of -10.0 (0 - 10.0)
+			z:         -3.0, // Above threshold of -10.0 (0 - 10.0)
 			allowance: 10.0,
 			want:      true,
 		},
@@ -239,9 +239,9 @@ func TestIsShallowDepthEdgeCases(t *testing.T) {
 				MaxZ:       0.0,
 				ZReference: gcode.ZRefMetadata,
 			},
-			z:         0.5,    // Above threshold of 1.0 (0 - (-1.0))
+			z:         0.5, // Above threshold of 1.0 (0 - (-1.0))
 			allowance: -1.0,
-			want:      false,  // 0.5 is not > 1.0
+			want:      false, // 0.5 is not > 1.0
 		},
 		{
 			name: "Very large Z value",
@@ -250,7 +250,7 @@ func TestIsShallowDepthEdgeCases(t *testing.T) {
 				MaxZ:       0.0,
 				ZReference: gcode.ZRefMetadata,
 			},
-			z:         50.0,   // Well above threshold
+			z:         50.0, // Well above threshold
 			allowance: 1.0,
 			want:      true,
 		},
@@ -261,7 +261,7 @@ func TestIsShallowDepthEdgeCases(t *testing.T) {
 				MaxZ:       0.0,
 				ZReference: gcode.ZRefMetadata,
 			},
-			z:         -99.0,  // Well below threshold of -1.0 (0 - 1.0)
+			z:         -99.0, // Well below threshold of -1.0 (0 - 1.0)
 			allowance: 1.0,
 			want:      false,
 		},

@@ -138,8 +138,8 @@ snapmaker-cnc-finisher heavy_finish.cnc 2.0 heavy_finish_opt.cnc
 ### Scenario 4: Batch Processing (Force Overwrite)
 
 ```bash
-snapmaker-cnc-finisher input1.cnc 1.0 output1.cnc --force
-snapmaker-cnc-finisher input2.cnc 1.5 output2.cnc --force
+snapmaker-cnc-finisher --force input1.cnc 1.0 output1.cnc
+snapmaker-cnc-finisher --force input2.cnc 1.5 output2.cnc
 ```
 
 **When to use**: Automating optimization for multiple files without prompts
@@ -153,7 +153,7 @@ snapmaker-cnc-finisher input2.cnc 1.5 output2.cnc --force
 For 4-axis CNC machines or complex toolpaths, you can control how multi-axis moves are handled:
 
 ```bash
-snapmaker-cnc-finisher input.cnc 1.0 output.cnc --strategy=<value>
+snapmaker-cnc-finisher --strategy=<value> input.cnc 1.0 output.cnc
 ```
 
 **Available Strategies**:
@@ -167,7 +167,7 @@ snapmaker-cnc-finisher input.cnc 1.0 output.cnc --strategy=<value>
 
 **Example**:
 ```bash
-snapmaker-cnc-finisher 4axis_finish.cnc 1.0 output.cnc --strategy=all-axes
+snapmaker-cnc-finisher --strategy=all-axes 4axis_finish.cnc 1.0 output.cnc
 ```
 
 ### Force Overwrite
@@ -175,7 +175,7 @@ snapmaker-cnc-finisher 4axis_finish.cnc 1.0 output.cnc --strategy=all-axes
 Skip confirmation prompt when output file exists:
 
 ```bash
-snapmaker-cnc-finisher input.cnc 1.0 output.cnc --force
+snapmaker-cnc-finisher --force input.cnc 1.0 output.cnc
 ```
 
 **Use case**: Scripting, CI/CD pipelines, repeated optimizations

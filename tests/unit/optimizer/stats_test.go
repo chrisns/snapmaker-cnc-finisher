@@ -96,51 +96,51 @@ func TestStatisticsKeptLines(t *testing.T) {
 
 func TestCalculateTimeSaved(t *testing.T) {
 	tests := []struct {
-		name     string
+		name       string
 		x1, y1, z1 float64 // Start position
 		x2, y2, z2 float64 // End position
-		feedRate float64   // Feed rate in mm/min
-		want     time.Duration
+		feedRate   float64 // Feed rate in mm/min
+		want       time.Duration
 	}{
 		{
-			name:     "Horizontal move 100mm at 1000mm/min",
-			x1:       0, y1: 0, z1: 0,
-			x2:       100, y2: 0, z2: 0,
+			name: "Horizontal move 100mm at 1000mm/min",
+			x1:   0, y1: 0, z1: 0,
+			x2: 100, y2: 0, z2: 0,
 			feedRate: 1000,
 			want:     6 * time.Second, // 100mm / 1000mm/min = 0.1 min = 6s
 		},
 		{
-			name:     "Vertical move 50mm at 500mm/min",
-			x1:       0, y1: 0, z1: 0,
-			x2:       0, y2: 0, z2: -50,
+			name: "Vertical move 50mm at 500mm/min",
+			x1:   0, y1: 0, z1: 0,
+			x2: 0, y2: 0, z2: -50,
 			feedRate: 500,
 			want:     6 * time.Second, // 50mm / 500mm/min = 0.1 min = 6s
 		},
 		{
-			name:     "Diagonal move at 1500mm/min",
-			x1:       0, y1: 0, z1: 0,
-			x2:       30, y2: 40, z2: 0, // 3-4-5 triangle = 50mm
+			name: "Diagonal move at 1500mm/min",
+			x1:   0, y1: 0, z1: 0,
+			x2: 30, y2: 40, z2: 0, // 3-4-5 triangle = 50mm
 			feedRate: 1500,
 			want:     2 * time.Second, // 50mm / 1500mm/min = 0.0333 min = 2s
 		},
 		{
-			name:     "3D diagonal move",
-			x1:       0, y1: 0, z1: 0,
-			x2:       10, y2: 10, z2: 10, // sqrt(300) ≈ 17.32mm
+			name: "3D diagonal move",
+			x1:   0, y1: 0, z1: 0,
+			x2: 10, y2: 10, z2: 10, // sqrt(300) ≈ 17.32mm
 			feedRate: 1000,
 			want:     1040 * time.Millisecond, // ~17.32mm / 1000mm/min ≈ 1.04s
 		},
 		{
-			name:     "Zero distance move",
-			x1:       10, y1: 20, z1: -5,
-			x2:       10, y2: 20, z2: -5,
+			name: "Zero distance move",
+			x1:   10, y1: 20, z1: -5,
+			x2: 10, y2: 20, z2: -5,
 			feedRate: 1000,
 			want:     0,
 		},
 		{
-			name:     "Default feed rate (1000mm/min) when zero provided",
-			x1:       0, y1: 0, z1: 0,
-			x2:       100, y2: 0, z2: 0,
+			name: "Default feed rate (1000mm/min) when zero provided",
+			x1:   0, y1: 0, z1: 0,
+			x2: 100, y2: 0, z2: 0,
 			feedRate: 0, // Should use default 1000mm/min
 			want:     6 * time.Second,
 		},

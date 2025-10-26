@@ -7,6 +7,17 @@ import (
 	"os"
 )
 
+const (
+	// InitialBufferSize is the initial buffer allocation for scanning GCode lines
+	InitialBufferSize = 64 * 1024 // 64KB
+
+	// MaxLineLength is the maximum length of a single GCode line
+	MaxLineLength = 1024 * 1024 // 1MB
+
+	// FlushInterval is how often to flush buffered writes (in lines)
+	FlushInterval = 1000
+)
+
 // ReadGCodeFile reads a GCode file and returns all lines
 // Uses bufio.Scanner for memory-efficient streaming
 func ReadGCodeFile(path string) ([]string, error) {
@@ -19,9 +30,9 @@ func ReadGCodeFile(path string) ([]string, error) {
 	var lines []string
 	scanner := bufio.NewScanner(file)
 
-	// Increase buffer size for large lines (default is 64KB)
-	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, 1024*1024) // 1MB max line length
+	// Increase buffer size for large lines
+	buf := make([]byte, 0, InitialBufferSize)
+	scanner.Buffer(buf, MaxLineLength)
 
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
@@ -51,8 +62,8 @@ func WriteGCodeFile(path string, lines []string) error {
 			return fmt.Errorf("failed to write line %d: %w", i, err)
 		}
 
-		// Flush every 1000 lines for memory efficiency
-		if (i+1)%1000 == 0 {
+		// Flush periodically for memory efficiency
+		if (i+1)%FlushInterval == 0 {
 			if err := writer.Flush(); err != nil {
 				return fmt.Errorf("failed to flush at line %d: %w", i, err)
 			}
@@ -83,8 +94,8 @@ func (bw *BufferedWriter) WriteLine(line string) error {
 
 	bw.lineCount++
 
-	// Auto-flush every 1000 lines
-	if bw.lineCount%1000 == 0 {
+	// Auto-flush periodically
+	if bw.lineCount%FlushInterval == 0 {
 		if err := bw.writer.Flush(); err != nil {
 			return fmt.Errorf("failed to auto-flush: %w", err)
 		}

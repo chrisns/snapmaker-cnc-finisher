@@ -12,6 +12,19 @@ noah-rough.cnc
 *.out
 /cmd/snapmaker-cnc-finisher/snapmaker-cnc-finisher
 /snapmaker-cnc-finisher
+bin/
+dist/
+build/
+
+# Test output files
+out*.cnc
+
+# Large generated test files (regenerate with tests/scripts/generate_large_gcode.go)
+tests/testdata/large_file.cnc
+tests/testdata/large_output.cnc
+tests/testdata/medium_file.cnc
+tests/testdata/medium_output.cnc
+tests/testdata/medium_output2.cnc
 
 # Go dependencies
 vendor/
