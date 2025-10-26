@@ -21,7 +21,7 @@ A Go CLI tool that optimizes Snapmaker Luban finishing pass GCode files by remov
 **Constraints**: Memory-conscious streaming for large files, <200MB memory footprint, static binary with zero runtime dependencies
 **Scale/Scope**: Single-purpose CLI tool, ~5-10 core packages, comprehensive test coverage (80%+), multi-platform CI/CD via GitHub Actions matrix
 
-**Research Notes**: All unknowns resolved in [research.md](./research.md). Key decisions: (1) stdlib `flag` chosen over Cobra per minimal dependency principle, (2) `github.com/256dpi/gcode` library for battle-tested parsing, (3) Go 1.25.3 for GC improvements on large files, (4) `bufio.Scanner` streaming for memory efficiency.
+**Research Notes**: All unknowns resolved in [research.md](./research.md). Key decisions: (1) stdlib `flag` chosen over Cobra per minimal dependency principle, (2) `github.com/256dpi/gcode` library for battle-tested parsing, (3) Go 1.25.3 (latest stable as of October 2025), (4) `bufio.Scanner` streaming for memory efficiency.
 
 ## Constitution Check
 

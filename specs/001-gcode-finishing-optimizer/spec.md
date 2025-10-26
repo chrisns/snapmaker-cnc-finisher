@@ -81,42 +81,39 @@ When provided with invalid inputs (non-existent files, invalid allowance values,
 
 ### Functional Requirements
 
-- **FR-001**: Tool MUST accept exactly three command-line arguments: input file path, allowance value (numeric), and output file path, with optional flags: --force (bypass overwrite confirmation), --strategy (set multi-axis move handling: 'safe' [default], 'all-axes', 'split', 'aggressive')
+- **FR-001**: Tool MUST accept exactly three command-line arguments: input file path, allowance value (numeric), and output file path, with optional flags: --force (bypass overwrite confirmation), --strategy (set multi-axis move handling: 'safe' [default], 'all-axes', 'split', 'aggressive'; case-insensitive; invalid values exit with code 1 and display error message)
 - **FR-002**: Tool MUST read and parse GCode files produced by Snapmaker Luban with support for both 3-axis and 4-axis configurations, validating Snapmaker header presence and issuing console warning if missing/malformed while proceeding if file is still parseable
 - **FR-003**: Tool MUST identify the axis configuration (3-axis vs 4-axis) from the GCode file header or command structure
-- **FR-004**: Tool MUST determine Z-axis reference point by: (1) auto-detecting from GCode header metadata (min_z/max_z), (2) falling back to machine work origin interpretation if metadata incomplete, (3) final fallback to material surface convention (Z=0 = top surface). Tool MUST display console alert indicating which method was used.
-- **FR-004b**: Tool MUST analyze Z-axis depth commands (G1 Z values) and compare them against the specified allowance threshold using the determined reference point
-- **FR-005**: Tool MUST remove cutting operations (G1 commands with feed rates) that occur at depths shallower than the allowance threshold, with strategy-based handling for multi-axis moves: 'safe' (default) preserves entire move if Z exceeds threshold; 'all-axes' preserves only if all axes indicate finishing work; 'split' attempts to split into single-axis commands; 'aggressive' removes entire move if Z is shallow
+- **FR-004**: Tool MUST determine Z-axis reference point by: (1) auto-detecting from GCode header metadata (min_z/max_z), (2) falling back to machine work origin interpretation if metadata incomplete, (3) final fallback to material surface convention (Z=0 = top surface). Tool MUST display console alert indicating which method was used. Tool MUST then analyze Z-axis depth commands (G1 Z values) and compare them against the specified allowance threshold using this determined reference point. Z-axis convention: Positive Z increases upward from reference point. "Shallow depth" means the Z-value is greater than (reference_point - allowance). Example: If reference=0 and allowance=1.0mm, only cutting moves with Z ≤ -1.0mm are preserved (moves at Z > -1.0mm are considered shallow and removed).
+- **FR-005**: Tool MUST remove cutting moves (G1 commands with feed rates) that occur at depths shallower than the allowance threshold, with strategy-based handling for multi-axis moves: 'safe' (default) preserves entire move if Z exceeds threshold; 'all-axes' preserves only if all axes indicate finishing work; 'split' attempts to split into single-axis commands; 'aggressive' removes entire move if Z is shallow
 - **FR-006**: Tool MUST preserve all non-cutting commands including rapid moves (G0), machine codes (M-codes), header comments, and configuration commands
 - **FR-007**: Tool MUST preserve the original GCode file structure including header information and metadata
-- **FR-008**: Tool MUST write the optimized GCode to the specified output file path, prompting for confirmation if the file exists (unless --force flag is provided)
-- **FR-009**: Tool MUST display progress updates to console during processing including lines processed and estimated completion
+- **FR-008**: Tool MUST write the optimized GCode to the specified output file path, prompting for confirmation if the file exists (see FR-001 for --force flag behavior)
+- **FR-009**: Tool MUST display progress updates to console during processing including lines processed and estimated completion. Progress ETA calculated using: (elapsed_time / lines_processed) × (total_lines - lines_processed). If total line count is unknown (streaming mode), display lines processed without ETA.
 - **FR-010**: Tool MUST report final statistics including total lines removed, percentage reduction, file size before/after, and estimated time savings (calculated by summing machining time of removed G1 moves using distance ÷ feed rate formula)
-- **FR-011**: Tool SHOULD support optional mechanism for users to provide feedback on actual job completion times to enable refinement of time estimation algorithm
-- **FR-012**: Tool MUST validate all inputs before processing and provide clear error messages for invalid inputs
-- **FR-013**: Tool MUST handle file I/O errors gracefully with appropriate error messages
+- **FR-011**: Tool MUST validate all inputs before processing and provide clear error messages for invalid inputs
+- **FR-012**: Tool MUST handle file I/O errors gracefully with appropriate error messages
 
 ### Key Entities
 
 - **GCode File**: Input/output file containing CNC machine instructions with commands, coordinates, and metadata
 - **GCode Command**: Individual instruction line with command type (G0, G1, M3, etc.), coordinates (X, Y, Z, B), and parameters
-- **Cutting Operation**: GCode command that performs material removal (typically G1 commands with Z-axis depth changes)
+- **Cutting Move**: GCode command that performs material removal (typically G1 commands with feed rates and Z-axis depth changes)
 - **Allowance Threshold**: Numeric value representing remaining material depth after rough cut (e.g., 1.0mm)
 - **Optimization Statistics**: Data structure tracking lines removed, file size changes, estimated time savings (calculated from removed G1 move distances and feed rates), and processing metrics
-- **Job Feedback**: Optional user-provided actual job completion time data used to refine time estimation algorithm accuracy
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
 - **SC-001**: Operators can process a finishing GCode file and receive an optimized output file in under 10 seconds for files up to 100,000 lines
-- **SC-002**: Optimized files reduce total machining time by at least 20% compared to original finishing pass for typical rough+finish workflows
+- **SC-002**: Optimized files reduce total machining time by at least 20% compared to original finishing pass for typical rough+finish workflows (measured as reduction in wall-clock time for CNC to execute the GCode from start to completion)
 - **SC-003**: Optimized GCode produces identical final surface quality as original finishing pass when verified by test cuts
 - **SC-004**: Tool correctly identifies and processes both 3-axis and 4-axis CNC GCode files with 100% accuracy
 - **SC-005**: Console progress updates appear at minimum every 10,000 lines processed or every 2 seconds, whichever is more frequent
 - **SC-006**: Tool handles GCode files up to 10 million lines without running out of memory or crashing
 - **SC-007**: 95% of invalid inputs result in clear, actionable error messages rather than crashes or unclear failures
-- **SC-008**: File size reduction averages 15-40% for typical finishing passes with 0.5-2.0mm allowances
+- **SC-008**: File size reduction averages 15-40% for typical finishing passes (typical = finishing passes with 0.5-2.0mm allowances on flat or contoured surfaces; outliers outside 15-40% range should be investigated for toolpath anomalies)
 
 ## Assumptions
 
@@ -141,12 +138,11 @@ When provided with invalid inputs (non-existent files, invalid allowance values,
 ### In Scope
 - Reading Snapmaker Luban GCode files
 - Parsing 3-axis and 4-axis GCode commands
-- Identifying and removing redundant cutting operations based on depth
+- Identifying and removing redundant cutting moves based on depth
 - Preserving file structure and non-cutting commands
 - Progress reporting and statistics
 - Time savings estimation based on removed G1 move calculations (distance ÷ feed rate)
-- Optional user feedback mechanism for actual job times to improve estimation accuracy
-- Command-line interface with three arguments (plus optional --force flag)
+- Command-line interface with three arguments (plus optional --force and --strategy flags)
 - Error handling for common failure modes
 
 ### Out of Scope

@@ -76,10 +76,11 @@ Every exported function/type requires:
 - [ ] T012 Implement GCode line parser in `internal/gcode/parser.go` using `github.com/256dpi/gcode.ParseLine`
 - [ ] T013 **TEST**: Create test for file header metadata extraction in `tests/unit/gcode/metadata_test.go` (MinZ/MaxZ, axis config)
 - [ ] T014 Implement header metadata extraction in `internal/gcode/metadata.go` (scan first 50 lines for `;MIN_Z`, detect B-axis)
+- [ ] T014b **TEST**: Create test for Z-axis reference fallback chain in `tests/unit/gcode/metadata_test.go` (table-driven: valid header → use metadata; missing min_z/max_z → fallback to machine origin; no metadata → fallback to surface convention Z=0. Verify console alert indicates which method was used)
 - [ ] T015 **TEST**: Create test for buffered file reading in `tests/unit/gcode/file_test.go` (bufio.Scanner streaming)
 - [ ] T016 Implement file reading with streaming in `internal/gcode/file.go` (open, scan lines, handle errors)
 - [ ] T017 **TEST**: Create test for buffered file writing in `tests/unit/gcode/file_test.go` (bufio.Writer)
-- [ ] T018 Implement file writing with buffering in `internal/gcode/file.go` (create, write lines, flush)
+- [ ] T018 Implement file writing with buffering in `internal/gcode/file.go` (create, write lines, flush). Flush strategy: flush every 1000 lines OR on completion. Use deferred flush to ensure cleanup on error.
 
 **Completion Criteria**: All foundational tests pass, file I/O streams large files without loading into memory, header metadata correctly extracted from test fixtures.
 
@@ -102,7 +103,7 @@ Every exported function/type requires:
 
 - [ ] T023 **TEST**: Create test for Z-depth comparison in `tests/unit/optimizer/filter_test.go` (table-driven: Z=-0.5 vs 1.0mm allowance → filter)
 - [ ] T024 Implement depth filtering logic in `internal/optimizer/filter.go` (compare Z-value vs allowance threshold)
-- [ ] T025 **TEST**: Create test for G0/M-code preservation in `tests/unit/optimizer/filter_test.go` (rapid moves and machine codes always retained)
+- [ ] T025 **TEST**: Create test for G0/M-code preservation in `tests/unit/optimizer/filter_test.go` (rapid moves and machine codes always retained, including table-driven test: "G0 Z-0.2 (shallow rapid) → KEEP (rapid moves always preserved even if shallow)")
 - [ ] T026 Implement command type detection in `internal/optimizer/filter.go` (IsRapidMove, IsCuttingMove, IsMachineCode)
 - [ ] T027 **TEST**: Create test for strategy enum in `tests/unit/optimizer/strategy_test.go` (parse "safe"/"all-axes"/"split"/"aggressive")
 - [ ] T028 Implement FilterStrategy enum in `internal/optimizer/strategy.go` (Safe, AllAxes, Split, Aggressive constants)
@@ -124,6 +125,7 @@ Every exported function/type requires:
 - [ ] T038 Implement argument validation in `internal/cli/args.go` (validate file exists, allowance >= 0, strategy is valid enum)
 - [ ] T039 **TEST**: Create test for output formatting in `tests/unit/cli/output_test.go` (final summary format, error message format)
 - [ ] T040 Implement console output formatter in `internal/cli/output.go` (PrintSummary, PrintError, exit codes per CLI contract)
+- [ ] T040b **TEST**: Create test for feed rate preservation in `tests/unit/optimizer/filter_test.go` (verify F parameter values preserved in kept G1 commands)
 
 ### Main Entry Point
 
@@ -160,8 +162,8 @@ Every exported function/type requires:
 
 ### Test Data Setup
 
-- [ ] T048 [P] Create fixture generator script `tests/scripts/generate_large_gcode.go` (generates 1M+ line GCode file with realistic commands)
-- [ ] T049 [P] Run generator to create test fixture `tests/testdata/large_file.cnc` (1M+ lines for progress testing)
+- [ ] T048 [P] Create fixture generator script `tests/scripts/generate_large_gcode.go` (generates 10M+ line GCode file with realistic commands)
+- [ ] T049 [P] Run generator to create test fixture `tests/testdata/large_file.cnc` (10M+ lines for progress testing)
 
 ### Progress Reporting
 
@@ -174,13 +176,13 @@ Every exported function/type requires:
 
 ### Validation
 
-- [ ] T057 **Acceptance Test**: Process `tests/testdata/large_file.cnc` (1M lines), verify SC-005 (progress updates every 10k lines or 2s), SC-006 (handles without crashing)
+- [ ] T057 **Acceptance Test**: Process `tests/testdata/large_file.cnc` (10M lines), verify SC-005 (progress updates every 10k lines or 2s), SC-006 (handles without crashing)
 
 **User Story 2 Completion Criteria**:
 - ✅ Console displays real-time progress during processing
 - ✅ Progress updates at minimum every 10k lines or 2 seconds
 - ✅ Final summary shows total lines removed and file size reduction
-- ✅ Large files (1M+ lines) process without memory issues
+- ✅ Large files (10M+ lines) process without memory issues
 - ✅ All tests pass
 
 ---
@@ -274,7 +276,6 @@ Every exported function/type requires:
 - [ ] T092 Verify multi-arch binaries build successfully (darwin/amd64, darwin/arm64, windows/amd64, linux/amd64)
 - [ ] T093 Test downloaded binaries on each platform (smoke test)
 - [ ] T094 Publish release notes with CHANGELOG, link to binaries
-- [ ] T095 [P] Document FR-011 deferral in CHANGELOG.md (mark as "Future Enhancement: User feedback mechanism for time estimation algorithm refinement")
 
 **Phase 6 Completion Criteria**:
 - ✅ Help and version flags work correctly
