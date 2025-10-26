@@ -2,7 +2,8 @@
 
 **Feature Branch**: `001-gcode-finishing-optimizer`
 **Created**: 2025-10-26
-**Status**: Draft
+**Status**: Implemented
+**Released**: v1.0.0 (2025-10-26)
 **Input**: User description: "I want a simple go application that will read the gcode cnc files provided that were produced by snapmaker luban. The command should take the arguments of the finishing.cnc file. The first argument is the file to load, the second is the allowance, assume that there has already been a rough cut that has reduced the material to this apart from the last in this case 1mm, so we can reduce any cuts from the gcode that do not address this since we'll just be cutting into air for most the time. The third argument is the output file. It should then create a new gcode file that is a optimised version of the finishing.cnc that skips cutting anything that the roughcut would have already done."
 
 ## Clarifications
