@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/chrisns/snapmaker-cnc-finisher/internal/optimizer"
 	"github.com/chrisns/snapmaker-cnc-finisher/internal/parser"
+	"github.com/chrisns/snapmaker-cnc-finisher/internal/progress"
 	"github.com/chrisns/snapmaker-cnc-finisher/internal/writer"
 )
 
@@ -97,6 +99,13 @@ func main() {
 }
 
 func optimizeGCodeFile(inputPath, outputPath string, allowance float64, strategy optimizer.OptimizationStrategy) error {
+	// Get input file size
+	inputFileInfo, err := os.Stat(inputPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat input file: %w", err)
+	}
+	inputFileSize := inputFileInfo.Size()
+
 	// Open input file
 	inputFile, err := os.Open(inputPath)
 	if err != nil {
@@ -105,6 +114,7 @@ func optimizeGCodeFile(inputPath, outputPath string, allowance float64, strategy
 	defer inputFile.Close()
 
 	// Parse GCode file
+	fmt.Println("Parsing GCode file...")
 	p, err := parser.NewParser(inputFile)
 	if err != nil {
 		return fmt.Errorf("failed to parse GCode file: %w", err)
@@ -116,6 +126,7 @@ func optimizeGCodeFile(inputPath, outputPath string, allowance float64, strategy
 	}
 
 	// Scan for minimum Z value
+	fmt.Println("Analyzing depth...")
 	minZ, err := p.ScanMinZ()
 	if err != nil {
 		return fmt.Errorf("failed to find minimum Z: %w", err)
@@ -125,7 +136,7 @@ func optimizeGCodeFile(inputPath, outputPath string, allowance float64, strategy
 	threshold := minZ + allowance
 
 	// Display depth analysis
-	fmt.Printf("Depth Analysis:\n")
+	fmt.Printf("\nDepth Analysis:\n")
 	fmt.Printf("  Min Z: %.3fmm\n", minZ)
 	fmt.Printf("  Threshold: %.3fmm (%.1fmm allowance)\n\n", threshold, allowance)
 
@@ -142,7 +153,16 @@ func optimizeGCodeFile(inputPath, outputPath string, allowance float64, strategy
 	// Create writer
 	wr := writer.NewWriter(outputFile)
 
+	// Create progress reporter
+	totalLines := p.Header().TotalLines
+	if totalLines == 0 {
+		totalLines = int64(len(p.File().Lines))
+	}
+	reporter := progress.NewReporter(totalLines)
+
 	// Process file
+	fmt.Println("Optimizing...")
+	startTime := time.Now()
 	linesProcessed := int64(0)
 	linesRemoved := int64(0)
 	linesPreserved := int64(0)
@@ -153,6 +173,7 @@ func optimizeGCodeFile(inputPath, outputPath string, allowance float64, strategy
 
 	for _, line := range p.File().Lines {
 		linesProcessed++
+		reporter.Update(linesProcessed)
 
 		// Track start position before updating state
 		startZ := p.State().Z
@@ -195,16 +216,38 @@ func optimizeGCodeFile(inputPath, outputPath string, allowance float64, strategy
 		}
 	}
 
-	// Display results
-	fmt.Printf("Processing Summary:\n")
-	fmt.Printf("  Total lines: %d\n", linesProcessed)
-	fmt.Printf("  Lines removed: %d (%.1f%%)\n", linesRemoved, float64(linesRemoved)/float64(linesProcessed)*100)
-	fmt.Printf("  Lines preserved: %d\n", linesPreserved)
-	if linesSplit > 0 {
-		fmt.Printf("  Moves split: %d (%s strategy)\n", linesSplit, strategy)
+	reporter.Finish()
+	processingDuration := time.Since(startTime)
+
+	// Get output file size
+	outputFileInfo, err := os.Stat(outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat output file: %w", err)
+	}
+	outputFileSize := outputFileInfo.Size()
+
+	// Calculate statistics
+	result := progress.OptimizationResult{
+		TotalInputLines:       linesProcessed,
+		InputFileSizeBytes:    inputFileSize,
+		LinesProcessed:        linesProcessed,
+		LinesRemoved:          linesRemoved,
+		LinesPreserved:        linesPreserved,
+		LinesSplit:            linesSplit,
+		MinZ:                  minZ,
+		Threshold:             threshold,
+		TotalOutputLines:      linesPreserved + linesSplit,
+		OutputFileSizeBytes:   outputFileSize,
+		ReductionPercent:      float64(linesRemoved) / float64(linesProcessed) * 100,
+		ProcessingDurationSec: processingDuration.Seconds(),
+		LinesPerSecond:        float64(linesProcessed) / processingDuration.Seconds(),
 	}
 
-	fmt.Printf("\nOptimization complete! Output written to: %s\n", outputPath)
+	// Display formatted results
+	formatter := progress.ResultFormatter{}
+	formatter.Display(result)
+
+	fmt.Printf("\n✓ Optimization complete! Output written to: %s\n", outputPath)
 
 	return nil
 }
