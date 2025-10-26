@@ -77,10 +77,10 @@ Every exported function/type requires:
 - [x] T013 **TEST**: Create test for file header metadata extraction in `tests/unit/gcode/metadata_test.go` (MinZ/MaxZ, axis config)
 - [x] T014 Implement header metadata extraction in `internal/gcode/metadata.go` (scan first 50 lines for `;MIN_Z`, detect B-axis)
 - [x] T014b **TEST**: Create test for Z-axis reference fallback chain in `tests/unit/gcode/metadata_test.go` (table-driven: valid header → use metadata; missing min_z/max_z → fallback to machine origin; no metadata → fallback to surface convention Z=0. Verify console alert indicates which method was used)
-- [ ] T015 **TEST**: Create test for buffered file reading in `tests/unit/gcode/file_test.go` (bufio.Scanner streaming)
-- [ ] T016 Implement file reading with streaming in `internal/gcode/file.go` (open, scan lines, handle errors)
-- [ ] T017 **TEST**: Create test for buffered file writing in `tests/unit/gcode/file_test.go` (bufio.Writer)
-- [ ] T018 Implement file writing with buffering in `internal/gcode/file.go` (create, write lines, flush). Flush strategy: flush every 1000 lines OR on completion. Use deferred flush to ensure cleanup on error.
+- [x] T015 **TEST**: Create test for buffered file reading in `tests/unit/gcode/file_test.go` (bufio.Scanner streaming)
+- [x] T016 Implement file reading with streaming in `internal/gcode/file.go` (open, scan lines, handle errors)
+- [x] T017 **TEST**: Create test for buffered file writing in `tests/unit/gcode/file_test.go` (bufio.Writer)
+- [x] T018 Implement file writing with buffering in `internal/gcode/file.go` (create, write lines, flush). Flush strategy: flush every 1000 lines OR on completion. Use deferred flush to ensure cleanup on error.
 
 **Completion Criteria**: All foundational tests pass, file I/O streams large files without loading into memory, header metadata correctly extracted from test fixtures.
 
