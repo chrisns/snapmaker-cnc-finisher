@@ -183,10 +183,10 @@ Per plan.md, this is a single binary CLI tool:
 - [X] T087 [P] Performance test with 10M line file in tests/integration/performance_test.go - verify memory usage <2GB, processing completes without crash, meets SC-006
 - [X] T088 Create CHANGELOG.md for v1.0.0 release documenting initial features
 - [X] T089 Create LICENSE file (MIT license per plan.md)
-- [ ] T090 Tag v1.0.0 release in git after all tests pass
-- [ ] T091 Verify GitHub Actions release workflow creates binaries for all 4 target platforms
-- [ ] T092 Create GitHub release with changelog and binary attachments
-- [ ] T093 Update repository description and topics on GitHub
+- [X] T090 Tag v1.0.0 release in git after all tests pass
+- [X] T091 Verify GitHub Actions release workflow creates binaries for all 4 target platforms
+- [X] T092 Create GitHub release with changelog and binary attachments
+- [X] T093 Update repository description and topics on GitHub
 
 ---
 
