@@ -19,6 +19,7 @@
 - Q: Strategy flag definition - The scope section mentions an optional "--strategy" flag, but the specification doesn't define what optimization strategies should be supported. What strategies should the tool implement? → A: Support two strategies: "conservative" (only remove moves entirely above threshold) and "aggressive" (remove moves + split threshold-crossing moves as currently specified). Aggressive is the default.
 - Q: Invalid strategy value handling - What should happen when a user provides an invalid value for the --strategy flag (e.g., --strategy=medium or --strategy=xyz)? → A: Reject with error message listing valid options: "Invalid strategy 'xyz'. Valid options are: conservative, aggressive"
 - Q: Initial modal state for coordinates - When the tool starts processing, before encountering the first explicit coordinate values, what should be the initial values for modal state tracking (X, Y, Z, B)? → A: Initialize from header metadata: Z from max_z (or 0 if max_z not in header), X/Y/B default to 0. This ensures correct move calculations even when early G1 commands use modal programming.
+- Q: Should optimization apply to both G0 (rapid positioning) and G1 (linear feed) moves, or only G1 cutting moves? → A: Apply optimization to both G0 and G1 moves. Both move types can traverse shallow zones unnecessarily. Removing or splitting shallow G0 rapid moves reduces total cycle time just like G1 moves. (Added in v1.1.0)
 
 ## User Scenarios & Testing *(mandatory)*
 

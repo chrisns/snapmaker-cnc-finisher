@@ -192,16 +192,16 @@ func (p *Parser) ScanMinZ() (float64, error) {
 		// Update modal state first
 		p.UpdateState(line)
 
-		// Check if this is a G1 command
-		isG1 := false
+		// Check if this is a G0 or G1 command
+		isMove := false
 		for _, code := range line.Codes {
-			if code.Letter == "G" && code.Value == 1 {
-				isG1 = true
+			if code.Letter == "G" && (code.Value == 0 || code.Value == 1) {
+				isMove = true
 				break
 			}
 		}
 
-		if !isG1 {
+		if !isMove {
 			continue
 		}
 
@@ -215,7 +215,7 @@ func (p *Parser) ScanMinZ() (float64, error) {
 	}
 
 	if !found {
-		return 0.0, fmt.Errorf("no G1 cutting moves found in file")
+		return 0.0, fmt.Errorf("no G0/G1 moves found in file")
 	}
 
 	// Reset state after scanning
