@@ -56,3 +56,11 @@ type Parser struct {
 	state    ModalState
 	warnings []string
 }
+
+// GetLine returns a specific line from the file by index.
+func (p *Parser) GetLine(index int) gcode.Line {
+	if index >= 0 && index < len(p.file.Lines) {
+		return p.file.Lines[index]
+	}
+	return gcode.Line{}
+}
