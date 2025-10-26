@@ -40,3 +40,67 @@ func ShouldAlwaysPreserve(cmd gcode.Command) bool {
 
 	return false
 }
+
+// ShouldFilterMove determines if a move should be filtered based on depth and strategy
+// This is the main filtering decision function that combines depth checking,
+// command type checking, and multi-axis strategy application
+func ShouldFilterMove(cmd gcode.Command, allowance float64, meta *gcode.Metadata, strategy FilterStrategy) bool {
+	// Never filter commands that should always be preserved
+	if ShouldAlwaysPreserve(cmd) {
+		return false
+	}
+
+	// Only filter cutting moves (G1)
+	if !cmd.IsCuttingMove() {
+		return false
+	}
+
+	// Get Z parameter
+	z, hasZ := cmd.Params["Z"]
+	if !hasZ {
+		return false // No Z movement, don't filter
+	}
+
+	// Check if depth is shallow
+	isShallow := ShouldFilterByDepth(z, allowance, meta)
+	if !isShallow {
+		return false // Deep cut, always keep
+	}
+
+	// Apply strategy for multi-axis moves
+	return applyStrategy(cmd, strategy)
+}
+
+// applyStrategy applies the filtering strategy to determine if a shallow move should be filtered
+func applyStrategy(cmd gcode.Command, strategy FilterStrategy) bool {
+	// Check if this is a multi-axis move (has X, Y, A, or B in addition to Z)
+	isMultiAxis := false
+	for param := range cmd.Params {
+		if param == "X" || param == "Y" || param == "A" || param == "B" {
+			isMultiAxis = true
+			break
+		}
+	}
+
+	switch strategy {
+	case StrategySafe:
+		// Only filter if it's a Z-only move (not multi-axis)
+		return !isMultiAxis
+
+	case StrategyAllAxes:
+		// Filter based on Z depth regardless of other axes
+		return true
+
+	case StrategySplit:
+		// For now, treat like Safe (split strategy requires move decomposition - advanced)
+		return !isMultiAxis
+
+	case StrategyAggressive:
+		// Filter all shallow moves, even multi-axis
+		return true
+
+	default:
+		// Unknown strategy, use safe default
+		return !isMultiAxis
+	}
+}

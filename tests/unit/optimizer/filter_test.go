@@ -170,3 +170,117 @@ func TestPreserveRapidAndMachineCodes(t *testing.T) {
 		})
 	}
 }
+
+func TestShouldFilterMultiAxisMove(t *testing.T) {
+	meta := &gcode.Metadata{
+		MinZ:       -5.0,
+		MaxZ:       0.0,
+		ZReference: gcode.ZRefMetadata,
+	}
+
+	tests := []struct {
+		name      string
+		cmd       gcode.Command
+		allowance float64
+		strategy  optimizer.FilterStrategy
+		want      bool
+	}{
+		{
+			name: "Safe strategy: shallow Z with XY motion - keep (multi-axis)",
+			cmd: gcode.Command{
+				Letter: "G",
+				Value:  1,
+				Params: map[string]float64{"X": 10.0, "Y": 20.0, "Z": -0.5, "F": 1000.0},
+			},
+			allowance: 1.0,
+			strategy:  optimizer.StrategySafe,
+			want:      false, // Keep because it's multi-axis
+		},
+		{
+			name: "Safe strategy: shallow Z-only move - filter",
+			cmd: gcode.Command{
+				Letter: "G",
+				Value:  1,
+				Params: map[string]float64{"Z": -0.5, "F": 1000.0},
+			},
+			allowance: 1.0,
+			strategy:  optimizer.StrategySafe,
+			want:      true, // Filter because Z-only and shallow
+		},
+		{
+			name: "Safe strategy: deep Z with XY - keep (deep)",
+			cmd: gcode.Command{
+				Letter: "G",
+				Value:  1,
+				Params: map[string]float64{"X": 10.0, "Z": -2.0, "F": 1000.0},
+			},
+			allowance: 1.0,
+			strategy:  optimizer.StrategySafe,
+			want:      false, // Keep because deep
+		},
+		{
+			name: "AllAxes strategy: shallow Z with XY - filter",
+			cmd: gcode.Command{
+				Letter: "G",
+				Value:  1,
+				Params: map[string]float64{"X": 10.0, "Y": 20.0, "Z": -0.5, "F": 1000.0},
+			},
+			allowance: 1.0,
+			strategy:  optimizer.StrategyAllAxes,
+			want:      true, // Filter based on Z depth regardless of other axes
+		},
+		{
+			name: "AllAxes strategy: deep Z with XY - keep",
+			cmd: gcode.Command{
+				Letter: "G",
+				Value:  1,
+				Params: map[string]float64{"X": 10.0, "Z": -2.0, "F": 1000.0},
+			},
+			allowance: 1.0,
+			strategy:  optimizer.StrategyAllAxes,
+			want:      false, // Keep because deep
+		},
+		{
+			name: "Aggressive strategy: shallow multi-axis - filter",
+			cmd: gcode.Command{
+				Letter: "G",
+				Value:  1,
+				Params: map[string]float64{"X": 10.0, "Y": 20.0, "B": 45.0, "Z": -0.3, "F": 1000.0},
+			},
+			allowance: 1.0,
+			strategy:  optimizer.StrategyAggressive,
+			want:      true, // Filter aggressively
+		},
+		{
+			name: "Safe strategy: 4-axis shallow - keep",
+			cmd: gcode.Command{
+				Letter: "G",
+				Value:  1,
+				Params: map[string]float64{"X": 10.0, "B": 30.0, "Z": -0.4, "F": 1000.0},
+			},
+			allowance: 1.0,
+			strategy:  optimizer.StrategySafe,
+			want:      false, // Keep multi-axis move in safe mode
+		},
+		{
+			name: "Not a cutting move - don't filter",
+			cmd: gcode.Command{
+				Letter: "G",
+				Value:  0,
+				Params: map[string]float64{"X": 10.0, "Z": -0.5},
+			},
+			allowance: 1.0,
+			strategy:  optimizer.StrategySafe,
+			want:      false, // G0 never filtered
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := optimizer.ShouldFilterMove(tt.cmd, tt.allowance, meta, tt.strategy)
+			if got != tt.want {
+				t.Errorf("ShouldFilterMove() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

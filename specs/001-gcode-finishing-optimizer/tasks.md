@@ -101,14 +101,14 @@ Every exported function/type requires:
 
 ### Core Optimization Logic
 
-- [ ] T023 **TEST**: Create test for Z-depth comparison in `tests/unit/optimizer/filter_test.go` (table-driven: Z=-0.5 vs 1.0mm allowance → filter)
-- [ ] T024 Implement depth filtering logic in `internal/optimizer/filter.go` (compare Z-value vs allowance threshold)
-- [ ] T025 **TEST**: Create test for G0/M-code preservation in `tests/unit/optimizer/filter_test.go` (rapid moves and machine codes always retained, including table-driven test: "G0 Z-0.2 (shallow rapid) → KEEP (rapid moves always preserved even if shallow)")
-- [ ] T026 Implement command type detection in `internal/optimizer/filter.go` (IsRapidMove, IsCuttingMove, IsMachineCode)
-- [ ] T027 **TEST**: Create test for strategy enum in `tests/unit/optimizer/strategy_test.go` (parse "safe"/"all-axes"/"split"/"aggressive")
-- [ ] T028 Implement FilterStrategy enum in `internal/optimizer/strategy.go` (Safe, AllAxes, Split, Aggressive constants)
-- [ ] T029 **TEST**: Create test for multi-axis move filtering in `tests/unit/optimizer/filter_test.go` (safe strategy: preserve if Z deep)
-- [ ] T030 Implement multi-axis move filtering in `internal/optimizer/filter.go` (apply strategy to G1 commands with multiple axes)
+- [x] T023 **TEST**: Create test for Z-depth comparison in `tests/unit/optimizer/filter_test.go` (table-driven: Z=-0.5 vs 1.0mm allowance → filter)
+- [x] T024 Implement depth filtering logic in `internal/optimizer/filter.go` (compare Z-value vs allowance threshold)
+- [x] T025 **TEST**: Create test for G0/M-code preservation in `tests/unit/optimizer/filter_test.go` (rapid moves and machine codes always retained, including table-driven test: "G0 Z-0.2 (shallow rapid) → KEEP (rapid moves always preserved even if shallow)")
+- [x] T026 Implement command type detection in `internal/optimizer/filter.go` (IsRapidMove, IsCuttingMove, IsMachineCode)
+- [x] T027 **TEST**: Create test for strategy enum in `tests/unit/optimizer/strategy_test.go` (parse "safe"/"all-axes"/"split"/"aggressive")
+- [x] T028 Implement FilterStrategy enum in `internal/optimizer/strategy.go` (Safe, AllAxes, Split, Aggressive constants)
+- [x] T029 **TEST**: Create test for multi-axis move filtering in `tests/unit/optimizer/filter_test.go` (safe strategy: preserve if Z deep)
+- [x] T030 Implement multi-axis move filtering in `internal/optimizer/filter.go` (apply strategy to G1 commands with multiple axes)
 
 ### Statistics Tracking
 
