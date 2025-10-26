@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2025-10-26
 
 ## Active Technologies
+- Go 1.21 + `github.com/256dpi/gcode` (v0.3.0) for GCode parsing, stdlib only otherwise (`flag`, `bufio`, `os`, `filepath`) (001-gcode-finishing-optimizer-1)
+- File I/O (input/output GCode text files) (001-gcode-finishing-optimizer-1)
 
 - Go 1.21 + `github.com/256dpi/gcode` (GCode parsing), stdlib only otherwise (flag, bufio, os, filepath) (001-gcode-finishing-optimizer)
 
@@ -22,6 +24,7 @@ tests/
 Go 1.21: Follow standard conventions
 
 ## Recent Changes
+- 001-gcode-finishing-optimizer-1: Added Go 1.21 + `github.com/256dpi/gcode` (v0.3.0) for GCode parsing, stdlib only otherwise (`flag`, `bufio`, `os`, `filepath`)
 
 - 001-gcode-finishing-optimizer: Added Go 1.21 + `github.com/256dpi/gcode` (GCode parsing), stdlib only otherwise (flag, bufio, os, filepath)
 
