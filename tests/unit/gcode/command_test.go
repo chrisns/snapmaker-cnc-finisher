@@ -82,18 +82,3 @@ func TestParseCommand(t *testing.T) {
 		})
 	}
 }
-
-func commandsEqual(a, b gcode.Command) bool {
-	if a.Letter != b.Letter || a.Value != b.Value || a.Comment != b.Comment {
-		return false
-	}
-	if len(a.Params) != len(b.Params) {
-		return false
-	}
-	for k, v := range a.Params {
-		if b.Params[k] != v {
-			return false
-		}
-	}
-	return true
-}

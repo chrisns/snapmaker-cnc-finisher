@@ -2,7 +2,6 @@ package gcode_test
 
 import (
 	"bytes"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -115,13 +114,6 @@ func TestBufferedWriterErrors(t *testing.T) {
 	})
 }
 
-// failingWriter always returns errors
-type failingWriter struct{}
-
-func (w *failingWriter) Write(p []byte) (n int, err error) {
-	return 0, os.ErrClosed
-}
-
 func TestParseCommandErrors(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -198,13 +190,6 @@ G0 X0 Y0`
 			t.Errorf("Expected ZRefSurface fallback, got %v", meta.ZReference)
 		}
 	})
-}
-
-// errorReader always returns errors
-type errorReader struct{}
-
-func (r *errorReader) Read(p []byte) (n int, err error) {
-	return 0, os.ErrClosed
 }
 
 func TestFileIOSuccessCases(t *testing.T) {
