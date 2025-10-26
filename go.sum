@@ -1,0 +1,6 @@
+github.com/256dpi/gcode v0.3.0 h1:xPPn7D7u3BHqTGeF0B7Qew2SOKMw+HSGGJmRmtBBWfg=
+github.com/256dpi/gcode v0.3.0/go.mod h1:3n56uQUND5n5fLLkIeBgxrC1H7mW7vPwJZU4LFC2Ozs=
+github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=
+github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=

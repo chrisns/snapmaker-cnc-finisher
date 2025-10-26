@@ -28,7 +28,6 @@ tests/testdata/medium_output2.cnc
 
 # Go dependencies
 vendor/
-go.sum
 
 # Test coverage
 coverage.txt
