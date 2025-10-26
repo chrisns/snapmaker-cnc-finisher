@@ -94,10 +94,10 @@ Every exported function/type requires:
 
 ### Test Data Setup
 
-- [ ] T019 [P] Create test fixture `tests/testdata/finishing_3axis.cnc` (100 lines, mixed shallow/deep G1 commands)
-- [ ] T020 [P] Create test fixture `tests/testdata/finishing_4axis.cnc` (includes B-axis commands)
-- [ ] T021 [P] Create test fixture `tests/testdata/all_shallow.cnc` (all G1 Z-values < 1.0mm for max filtering test)
-- [ ] T022 [P] Create test fixture `tests/testdata/all_deep.cnc` (all G1 Z-values > 1.0mm for min filtering test)
+- [x] T019 [P] Create test fixture `tests/testdata/finishing_3axis.cnc` (100 lines, mixed shallow/deep G1 commands)
+- [x] T020 [P] Create test fixture `tests/testdata/finishing_4axis.cnc` (includes B-axis commands)
+- [x] T021 [P] Create test fixture `tests/testdata/all_shallow.cnc` (all G1 Z-values < 1.0mm for max filtering test)
+- [x] T022 [P] Create test fixture `tests/testdata/all_deep.cnc` (all G1 Z-values > 1.0mm for min filtering test)
 
 ### Core Optimization Logic
 
