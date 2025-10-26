@@ -176,7 +176,7 @@ func optimizeGCodeFile(inputPath, outputPath string, allowance float64, strategy
 		reporter.Update(linesProcessed)
 
 		// Track start position before updating state
-		startZ := p.State().Z
+		startX, startY, startZ := p.State().X, p.State().Y, p.State().Z
 
 		// Update modal state
 		p.UpdateState(line)
@@ -205,14 +205,67 @@ func optimizeGCodeFile(inputPath, outputPath string, allowance float64, strategy
 		// Classify the move
 		classification := opt.ClassifyMove(startZ, endZ)
 
-		// Check if we should preserve this move
-		if opt.ShouldPreserve(classification) {
+		// Handle based on classification and strategy
+		if classification == optimizer.Shallow {
+			// Always remove shallow moves
+			linesRemoved++
+		} else if classification == optimizer.Deep || classification == optimizer.NonCutting {
+			// Always preserve deep moves and non-cutting commands
 			if err := wr.WriteLine(line); err != nil {
 				return fmt.Errorf("failed to write line: %w", err)
 			}
 			linesPreserved++
-		} else {
-			linesRemoved++
+		} else if classification == optimizer.CrossingEnter || classification == optimizer.CrossingLeave {
+			// Crossing moves - behavior depends on strategy
+			if opt.Strategy() == optimizer.Conservative {
+				// Conservative: preserve entire move
+				if err := wr.WriteLine(line); err != nil {
+					return fmt.Errorf("failed to write line: %w", err)
+				}
+				linesPreserved++
+			} else {
+				// Aggressive: split the move at threshold
+				// startX, startY, startZ already captured before UpdateState
+				// Get end coordinates from current state (after update)
+				endX, endY := p.State().X, p.State().Y
+
+				// Calculate intersection point
+				intersection, err := opt.CalculateIntersection(startX, startY, startZ, endX, endY, endZ)
+				if err != nil {
+					// If can't calculate intersection, preserve whole move (fallback to conservative)
+					if err := wr.WriteLine(line); err != nil {
+						return fmt.Errorf("failed to write line: %w", err)
+					}
+					linesPreserved++
+					continue
+				}
+
+				// Split the move
+				line1, line2, err := opt.SplitMove(line, intersection, classification, startX, startY, startZ)
+				if err != nil {
+					// If can't split, preserve whole move (fallback to conservative)
+					if err := wr.WriteLine(line); err != nil {
+						return fmt.Errorf("failed to write line: %w", err)
+					}
+					linesPreserved++
+					continue
+				}
+
+				// Write split moves
+				if len(line1.Codes) > 0 {
+					if err := wr.WriteLine(line1); err != nil {
+						return fmt.Errorf("failed to write split line: %w", err)
+					}
+					linesPreserved++
+				}
+				if len(line2.Codes) > 0 {
+					if err := wr.WriteLine(line2); err != nil {
+						return fmt.Errorf("failed to write split line: %w", err)
+					}
+					linesPreserved++
+				}
+				linesSplit++
+			}
 		}
 	}
 
