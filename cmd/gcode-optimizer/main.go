@@ -182,15 +182,7 @@ func optimizeGCodeFile(inputPath, outputPath string, allowance float64, strategy
 		p.UpdateState(line)
 
 		// Check if this is a G0 or G1 move
-		isMove := false
-		for _, code := range line.Codes {
-			if code.Letter == "G" && (code.Value == 0 || code.Value == 1) {
-				isMove = true
-				break
-			}
-		}
-
-		if !isMove {
+		if !parser.IsMove(line) {
 			// Not a G0/G1 move - preserve as-is
 			if err := wr.WriteLine(line); err != nil {
 				return fmt.Errorf("failed to write line: %w", err)

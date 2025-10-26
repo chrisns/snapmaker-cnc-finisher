@@ -26,7 +26,7 @@ func (o *Optimizer) Strategy() OptimizationStrategy {
 	return o.strategy
 }
 
-// ClassifyMove categorizes a G1 move based on start/end Z relative to threshold.
+// ClassifyMove categorizes a move (G0 or G1) based on start/end Z relative to threshold.
 func (o *Optimizer) ClassifyMove(startZ, endZ float64) MoveClassification {
 	startDeep := startZ <= o.threshold
 	endDeep := endZ <= o.threshold
@@ -91,24 +91,27 @@ func (o *Optimizer) ShouldPreserve(classification MoveClassification) bool {
 	}
 }
 
-// SplitMove generates new GCode lines for a crossing move.
+// SplitMove generates new GCode lines for a crossing move (G0 or G1).
+// For G1 moves: preserves feed rate in split segments.
+// For G0 moves: no feed rate (rapid positioning).
 // For CrossingEnter: returns (moveToIntersection, moveFromIntersection)
 // For CrossingLeave: returns (moveToIntersection, empty)
 func (o *Optimizer) SplitMove(line gcode.Line, intersection IntersectionPoint, classification MoveClassification, startX, startY, startZ float64) (gcode.Line, gcode.Line, error) {
-	// Extract feed rate from original line
+	// Extract move type (G0 or G1) and feed rate from original line
 	feedRate := 0.0
-	hasG1 := false
+	gValue := -1.0
+
 	for _, code := range line.Codes {
-		if code.Letter == "G" && code.Value == 1 {
-			hasG1 = true
+		if code.Letter == "G" && (code.Value == 0 || code.Value == 1) {
+			gValue = code.Value
 		}
 		if code.Letter == "F" {
 			feedRate = code.Value
 		}
 	}
 
-	if !hasG1 {
-		return gcode.Line{}, gcode.Line{}, fmt.Errorf("line is not a G1 move")
+	if gValue != 0 && gValue != 1 {
+		return gcode.Line{}, gcode.Line{}, fmt.Errorf("line is not a G0 or G1 move")
 	}
 
 	// Get end coordinates from original line
@@ -130,38 +133,39 @@ func (o *Optimizer) SplitMove(line gcode.Line, intersection IntersectionPoint, c
 		// Start above, end below: preserve intersection → end
 		line1 = gcode.Line{
 			Codes: []gcode.GCode{
-				{Letter: "G", Value: 1},
+				{Letter: "G", Value: gValue}, // Use detected G value (0 or 1)
 				{Letter: "X", Value: math.Round(intersection.X*10000) / 10000}, // 4 decimal places
 				{Letter: "Y", Value: math.Round(intersection.Y*10000) / 10000},
 				{Letter: "Z", Value: math.Round(intersection.Z*10000) / 10000},
 			},
 		}
-		if feedRate > 0 {
+		// Only add feed rate for G1 moves (G0 rapid moves don't use feed rates)
+		if gValue == 1 && feedRate > 0 {
 			line1.Codes = append(line1.Codes, gcode.GCode{Letter: "F", Value: feedRate})
 		}
 
 		line2 = gcode.Line{
 			Codes: []gcode.GCode{
-				{Letter: "G", Value: 1},
+				{Letter: "G", Value: gValue},
 				{Letter: "X", Value: endX},
 				{Letter: "Y", Value: endY},
 				{Letter: "Z", Value: endZ},
 			},
 		}
-		if feedRate > 0 {
+		if gValue == 1 && feedRate > 0 {
 			line2.Codes = append(line2.Codes, gcode.GCode{Letter: "F", Value: feedRate})
 		}
 	} else if classification == CrossingLeave {
 		// Start below, end above: preserve start → intersection
 		line1 = gcode.Line{
 			Codes: []gcode.GCode{
-				{Letter: "G", Value: 1},
+				{Letter: "G", Value: gValue},
 				{Letter: "X", Value: math.Round(intersection.X*10000) / 10000},
 				{Letter: "Y", Value: math.Round(intersection.Y*10000) / 10000},
 				{Letter: "Z", Value: math.Round(intersection.Z*10000) / 10000},
 			},
 		}
-		if feedRate > 0 {
+		if gValue == 1 && feedRate > 0 {
 			line1.Codes = append(line1.Codes, gcode.GCode{Letter: "F", Value: feedRate})
 		}
 		// line2 remains empty (discard shallow portion)

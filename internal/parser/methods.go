@@ -9,6 +9,16 @@ import (
 	"github.com/256dpi/gcode"
 )
 
+// IsMove returns true if the line is a G0 or G1 command.
+func IsMove(line gcode.Line) bool {
+	for _, code := range line.Codes {
+		if code.Letter == "G" && (code.Value == 0 || code.Value == 1) {
+			return true
+		}
+	}
+	return false
+}
+
 // NewParser creates a parser from an io.Reader.
 // It parses the GCode file, extracts header metadata, and initializes modal state.
 func NewParser(r io.Reader) (*Parser, error) {
@@ -193,15 +203,7 @@ func (p *Parser) ScanMinZ() (float64, error) {
 		p.UpdateState(line)
 
 		// Check if this is a G0 or G1 command
-		isMove := false
-		for _, code := range line.Codes {
-			if code.Letter == "G" && (code.Value == 0 || code.Value == 1) {
-				isMove = true
-				break
-			}
-		}
-
-		if !isMove {
+		if !IsMove(line) {
 			continue
 		}
 

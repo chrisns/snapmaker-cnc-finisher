@@ -3,7 +3,7 @@
 // for move splitting.
 package optimizer
 
-// MoveClassification categorizes a G1 cutting move relative to the depth threshold.
+// MoveClassification categorizes a move (G0 or G1) relative to the depth threshold.
 // This classification determines what optimization action to take.
 type MoveClassification int
 
