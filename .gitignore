@@ -1,6 +1,6 @@
-# Test fixtures
-noah-finishing.cnc
-noah-rough.cnc
+# CNC files (exclude all except test fixtures in tests/testdata/)
+*.cnc
+!tests/testdata/*.cnc
 
 # Go build artifacts
 *.exe
