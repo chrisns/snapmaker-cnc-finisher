@@ -180,12 +180,13 @@ Per plan.md, this is a single binary CLI tool:
 - [ ] T084 Manual smoke test on macOS: build binary, run on freya.cnc, verify output
 - [ ] T085 Manual smoke test on Linux: build binary, run on freya.cnc, verify output
 - [ ] T086 Manual smoke test on Windows: build binary, run on freya.cnc, verify output
-- [ ] T087 Create CHANGELOG.md for v1.0.0 release documenting initial features
-- [ ] T088 Create LICENSE file (MIT license per plan.md)
-- [ ] T089 Tag v1.0.0 release in git after all tests pass
-- [ ] T090 Verify GitHub Actions release workflow creates binaries for all 4 target platforms
-- [ ] T091 Create GitHub release with changelog and binary attachments
-- [ ] T092 Update repository description and topics on GitHub
+- [ ] T087 [P] Performance test with 10M line file in tests/integration/performance_test.go - verify memory usage <2GB, processing completes without crash, meets SC-006
+- [ ] T088 Create CHANGELOG.md for v1.0.0 release documenting initial features
+- [ ] T089 Create LICENSE file (MIT license per plan.md)
+- [ ] T090 Tag v1.0.0 release in git after all tests pass
+- [ ] T091 Verify GitHub Actions release workflow creates binaries for all 4 target platforms
+- [ ] T092 Create GitHub release with changelog and binary attachments
+- [ ] T093 Update repository description and topics on GitHub
 
 ---
 
@@ -370,7 +371,7 @@ Per the project constitution, comprehensive testing is NON-NEGOTIABLE:
 
 ## Task Summary
 
-**Total Tasks**: 92 (including setup, foundational, 3 user stories, polish)
+**Total Tasks**: 93 (including setup, foundational, 3 user stories, polish)
 
 **Tasks per Phase**:
 - Phase 1 (Setup): 6 tasks
@@ -378,10 +379,10 @@ Per the project constitution, comprehensive testing is NON-NEGOTIABLE:
 - Phase 3 (US1 - Basic Optimization): 27 tasks (11 tests + 16 implementation)
 - Phase 4 (US2 - Progress Monitoring): 15 tasks (4 tests + 11 implementation)
 - Phase 5 (US3 - Error Handling): 16 tasks (6 tests + 10 implementation)
-- Phase 6 (Polish): 22 tasks
+- Phase 6 (Polish): 23 tasks
 
 **Parallel Opportunities**:
-- 42 tasks marked [P] (46% can run in parallel given proper sequencing)
+- 43 tasks marked [P] (46% can run in parallel given proper sequencing)
 - All 3 user stories can proceed in parallel after Foundational phase
 - All tests within a user story can run in parallel
 

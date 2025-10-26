@@ -80,7 +80,7 @@ When provided with invalid inputs (non-existent files, invalid allowance values,
 - What happens with rapid moves (G0) vs. cutting moves (G1) at shallow depths? (Should preserve rapid moves even if shallow, only remove cutting moves)
 - How are moves handled when they cross the depth threshold? (Depends on strategy: aggressive splits moves using parametric linear interpolation - see FR-013; conservative preserves entire crossing moves - see FR-005)
 - What happens if output file already exists? (Should prompt for confirmation; --force flag allows overwrite without prompting for automation)
-- What happens with extremely large files (millions of lines)? (Should process efficiently with memory-conscious streaming)
+- What happens with extremely large files (millions of lines)? (Should process efficiently with memory-conscious in-memory processing using efficient data structures)
 - What happens when --strategy flag is not specified? (Defaults to aggressive strategy with move splitting enabled)
 - What happens with invalid --strategy flag values? (Tool rejects with error listing valid options: conservative, aggressive)
 
@@ -105,7 +105,7 @@ When provided with invalid inputs (non-existent files, invalid allowance values,
 - **FR-006**: Tool MUST preserve all non-cutting commands including rapid moves (G0), machine codes (M-codes), header comments, and configuration commands
 - **FR-007**: Tool MUST preserve the original GCode file structure including header information and metadata
 - **FR-008**: Tool MUST write the optimized GCode to the specified output file path, prompting for confirmation if the file exists (see FR-001 for --force flag behavior)
-- **FR-009**: Tool MUST display progress updates to console during processing including lines processed and estimated completion. Progress ETA calculated using: (elapsed_time / lines_processed) × (total_lines - lines_processed). If total line count is unknown (streaming mode), display lines processed without ETA.
+- **FR-009**: Tool MUST display progress updates to console during processing including lines processed and estimated completion. Progress ETA calculated using: (elapsed_time / lines_processed) × (total_lines - lines_processed). If total line count is unavailable in header metadata, display lines processed without ETA.
 - **FR-010**: Tool MUST report final statistics including total lines removed, percentage reduction, file size before/after, and estimated time savings (calculated by summing machining time of removed G1 moves using distance ÷ feed rate formula)
 - **FR-011**: Tool MUST validate all inputs before processing and provide clear error messages for invalid inputs. Validation includes: file path existence, allowance value (must be numeric and non-negative), and --strategy flag value (must be "conservative" or "aggressive" if specified). Invalid --strategy values MUST produce error message format: "Invalid strategy '<value>'. Valid options are: conservative, aggressive"
 - **FR-012**: Tool MUST handle file I/O errors gracefully with appropriate error messages

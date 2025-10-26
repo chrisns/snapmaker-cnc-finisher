@@ -124,32 +124,12 @@ type IntersectionPoint struct {
 }
 ```
 
-**Calculation** (Parametric Linear Interpolation):
-```go
-func CalculateIntersection(start, end ModalState, threshold float64) (IntersectionPoint, error) {
-    deltaZ := end.Z - start.Z
+**Calculation**: See spec.md FR-013 for authoritative parametric linear interpolation formula. Implementation follows the exact algorithm specified in requirements:
 
-    // Edge case: horizontal move at threshold
-    if math.Abs(deltaZ) < 1e-9 {
-        return IntersectionPoint{}, errors.New("move does not cross threshold (horizontal)")
-    }
-
-    // Parametric parameter
-    t := (threshold - start.Z) / deltaZ
-
-    // Validate t in range (should be 0 < t < 1 for crossing moves)
-    if t <= 0 || t >= 1 {
-        return IntersectionPoint{}, fmt.Errorf("intersection outside segment (t=%f)", t)
-    }
-
-    return IntersectionPoint{
-        X: start.X + t*(end.X-start.X),
-        Y: start.Y + t*(end.Y-start.Y),
-        Z: threshold,  // Exact, no floating-point drift
-        T: t,
-    }, nil
-}
-```
+1. Calculate intersection parameter: `t = (threshold - Z_start) / (Z_end - Z_start)`
+2. Calculate intersection point: `X₀ = X_start + t(X_end - X_start)`, `Y₀ = Y_start + t(Y_end - Y_start)`, `Z₀ = threshold`
+3. Validate `0 < t < 1` (indicates move crosses threshold within segment)
+4. Handle edge case: `deltaZ ≈ 0` (horizontal move, does not cross threshold vertically)
 
 **Precision**:
 - Coordinates formatted to 3-4 decimal places per spec FR-013
