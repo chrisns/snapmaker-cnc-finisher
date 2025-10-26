@@ -51,14 +51,14 @@ Every exported function/type requires:
 
 ### Tasks
 
-- [ ] T001 Initialize Go module with `go mod init github.com/chrisns/snapmaker-cnc-finisher`
-- [ ] T002 Create project directory structure (cmd/, internal/, tests/, .github/workflows/)
-- [ ] T003 Add dependency `github.com/256dpi/gcode` via `go get github.com/256dpi/gcode`
-- [ ] T004 [P] Create `.gitignore` for Go (binaries, IDE files, test coverage)
-- [ ] T005 [P] Create `LICENSE` file (per Constitution Principle IV - open source)
-- [ ] T006 [P] Create initial `README.md` with project description and quick start
-- [ ] T007 [P] Create GitHub Actions CI workflow at `.github/workflows/ci.yml` (lint, test matrix: macOS/Windows/Linux)
-- [ ] T008 [P] Create GitHub Actions release workflow at `.github/workflows/release.yml` (multi-arch builds per Constitution Principle IV)
+- [x] T001 Initialize Go module with `go mod init github.com/chrisns/snapmaker-cnc-finisher`
+- [x] T002 Create project directory structure (cmd/, internal/, tests/, .github/workflows/)
+- [x] T003 Add dependency `github.com/256dpi/gcode` via `go get github.com/256dpi/gcode`
+- [x] T004 [P] Create `.gitignore` for Go (binaries, IDE files, test coverage)
+- [x] T005 [P] Create `LICENSE` file (per Constitution Principle IV - open source)
+- [x] T006 [P] Create initial `README.md` with project description and quick start
+- [x] T007 [P] Create GitHub Actions CI workflow at `.github/workflows/ci.yml` (lint, test matrix: macOS/Windows/Linux)
+- [x] T008 [P] Create GitHub Actions release workflow at `.github/workflows/release.yml` (multi-arch builds per Constitution Principle IV)
 
 **Completion Criteria**: `go build` succeeds, CI pipeline runs successfully, project structure matches plan.md.
 
@@ -70,13 +70,13 @@ Every exported function/type requires:
 
 ### Tasks
 
-- [ ] T009 **TEST**: Create test for GCode command parsing in `tests/unit/gcode/command_test.go` (parse "G1 X10.5 Y20.3 Z-1.2 F1500")
-- [ ] T010 Implement GCode command struct in `internal/gcode/command.go` (Letter, Value, Comment fields)
-- [ ] T011 **TEST**: Create test for GCode line parsing in `tests/unit/gcode/parser_test.go` (table-driven: comments, G0, G1, M-codes)
-- [ ] T012 Implement GCode line parser in `internal/gcode/parser.go` using `github.com/256dpi/gcode.ParseLine`
-- [ ] T013 **TEST**: Create test for file header metadata extraction in `tests/unit/gcode/metadata_test.go` (MinZ/MaxZ, axis config)
-- [ ] T014 Implement header metadata extraction in `internal/gcode/metadata.go` (scan first 50 lines for `;MIN_Z`, detect B-axis)
-- [ ] T014b **TEST**: Create test for Z-axis reference fallback chain in `tests/unit/gcode/metadata_test.go` (table-driven: valid header → use metadata; missing min_z/max_z → fallback to machine origin; no metadata → fallback to surface convention Z=0. Verify console alert indicates which method was used)
+- [x] T009 **TEST**: Create test for GCode command parsing in `tests/unit/gcode/command_test.go` (parse "G1 X10.5 Y20.3 Z-1.2 F1500")
+- [x] T010 Implement GCode command struct in `internal/gcode/command.go` (Letter, Value, Comment fields)
+- [x] T011 **TEST**: Create test for GCode line parsing in `tests/unit/gcode/parser_test.go` (table-driven: comments, G0, G1, M-codes)
+- [x] T012 Implement GCode line parser in `internal/gcode/parser.go` using `github.com/256dpi/gcode.ParseLine`
+- [x] T013 **TEST**: Create test for file header metadata extraction in `tests/unit/gcode/metadata_test.go` (MinZ/MaxZ, axis config)
+- [x] T014 Implement header metadata extraction in `internal/gcode/metadata.go` (scan first 50 lines for `;MIN_Z`, detect B-axis)
+- [x] T014b **TEST**: Create test for Z-axis reference fallback chain in `tests/unit/gcode/metadata_test.go` (table-driven: valid header → use metadata; missing min_z/max_z → fallback to machine origin; no metadata → fallback to surface convention Z=0. Verify console alert indicates which method was used)
 - [ ] T015 **TEST**: Create test for buffered file reading in `tests/unit/gcode/file_test.go` (bufio.Scanner streaming)
 - [ ] T016 Implement file reading with streaming in `internal/gcode/file.go` (open, scan lines, handle errors)
 - [ ] T017 **TEST**: Create test for buffered file writing in `tests/unit/gcode/file_test.go` (bufio.Writer)

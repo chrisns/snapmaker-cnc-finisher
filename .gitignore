@@ -1,2 +1,41 @@
+# Test fixtures
 noah-finishing.cnc
 noah-rough.cnc
+
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/cmd/snapmaker-cnc-finisher/snapmaker-cnc-finisher
+/snapmaker-cnc-finisher
+
+# Go dependencies
+vendor/
+go.sum
+
+# Test coverage
+coverage.txt
+coverage.html
+*.coverprofile
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+
+# Logs
+*.log

@@ -6,5 +6,5 @@
       "Bash(git commit:*)"
     ]
   },
-  "disableAllHooks": true
+  "disableAllHooks": false
 }
