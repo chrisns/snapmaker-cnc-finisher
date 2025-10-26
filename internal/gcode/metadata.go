@@ -12,18 +12,18 @@ import (
 type ZReference int
 
 const (
-	ZRefMetadata       ZReference = iota // From GCode header metadata (min_z/max_z)
-	ZRefMachineOrigin                    // Fallback to machine work origin
-	ZRefSurface                          // Fallback to material surface convention (Z=0 = top)
+	ZRefMetadata      ZReference = iota // From GCode header metadata (min_z/max_z)
+	ZRefMachineOrigin                   // Fallback to machine work origin
+	ZRefSurface                         // Fallback to material surface convention (Z=0 = top)
 )
 
 // Metadata contains extracted header information from a GCode file
 type Metadata struct {
-	MinZ         float64    // Minimum Z value from header
-	MaxZ         float64    // Maximum Z value from header
-	Is4Axis      bool       // True if B-axis commands detected
-	ZReference   ZReference // How Z-axis reference was determined
-	ZRefMessage  string     // Human-readable message about Z reference method
+	MinZ        float64    // Minimum Z value from header
+	MaxZ        float64    // Maximum Z value from header
+	Is4Axis     bool       // True if B-axis commands detected
+	ZReference  ZReference // How Z-axis reference was determined
+	ZRefMessage string     // Human-readable message about Z reference method
 }
 
 // ExtractMetadata scans the first 50 lines of a GCode file to extract header metadata
