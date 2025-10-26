@@ -112,10 +112,10 @@ Every exported function/type requires:
 
 ### Statistics Tracking
 
-- [ ] T031 **TEST**: Create test for statistics tracking in `tests/unit/optimizer/stats_test.go` (accumulate removed lines, calculate percentages)
-- [ ] T032 Implement Statistics struct in `internal/optimizer/stats.go` (TotalLines, RemovedLines, BytesIn/Out, EstimatedTimeSaved)
-- [ ] T033 **TEST**: Create test for time savings calculation in `tests/unit/optimizer/stats_test.go` (distance ÷ feed rate for removed G1 moves)
-- [ ] T034 Implement time savings calculator in `internal/optimizer/stats.go` (Euclidean distance, accumulate time per removed move)
+- [x] T031 **TEST**: Create test for statistics tracking in `tests/unit/optimizer/stats_test.go` (accumulate removed lines, calculate percentages)
+- [x] T032 Implement Statistics struct in `internal/optimizer/stats.go` (TotalLines, RemovedLines, BytesIn/Out, EstimatedTimeSaved)
+- [x] T033 **TEST**: Create test for time savings calculation in `tests/unit/optimizer/stats_test.go` (distance ÷ feed rate for removed G1 moves)
+- [x] T034 Implement time savings calculator in `internal/optimizer/stats.go` (Euclidean distance, accumulate time per removed move)
 
 ### CLI Interface
 
