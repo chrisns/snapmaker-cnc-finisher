@@ -96,10 +96,11 @@ func (o *Optimizer) ShouldPreserve(classification MoveClassification) bool {
 // For G0 moves: no feed rate (rapid positioning).
 // For CrossingEnter: returns (moveToIntersection, moveFromIntersection)
 // For CrossingLeave: returns (moveToIntersection, empty)
-func (o *Optimizer) SplitMove(line gcode.Line, intersection IntersectionPoint, classification MoveClassification, startX, startY, startZ float64) (gcode.Line, gcode.Line, error) {
-	// Extract move type (G0 or G1) and feed rate from original line
+func (o *Optimizer) SplitMove(line gcode.Line, intersection IntersectionPoint, classification MoveClassification, startX, startY, startZ, startB float64) (gcode.Line, gcode.Line, error) {
+	// Extract move type, feed rate, and track which coordinates are present
 	feedRate := 0.0
 	gValue := -1.0
+	hasX, hasY, hasZ, hasB := false, false, false, false
 
 	for _, code := range line.Codes {
 		if code.Letter == "G" && (code.Value == 0 || code.Value == 1) {
@@ -108,14 +109,27 @@ func (o *Optimizer) SplitMove(line gcode.Line, intersection IntersectionPoint, c
 		if code.Letter == "F" {
 			feedRate = code.Value
 		}
+		// Track which coordinates are present in original line
+		if code.Letter == "X" {
+			hasX = true
+		}
+		if code.Letter == "Y" {
+			hasY = true
+		}
+		if code.Letter == "Z" {
+			hasZ = true
+		}
+		if code.Letter == "B" {
+			hasB = true
+		}
 	}
 
 	if gValue != 0 && gValue != 1 {
 		return gcode.Line{}, gcode.Line{}, fmt.Errorf("line is not a G0 or G1 move")
 	}
 
-	// Get end coordinates from original line
-	endX, endY, endZ := startX, startY, startZ
+	// Get end coordinates from original line (modal: start from current position)
+	endX, endY, endZ, endB := startX, startY, startZ, startB
 	for _, code := range line.Codes {
 		switch code.Letter {
 		case "X":
@@ -124,47 +138,77 @@ func (o *Optimizer) SplitMove(line gcode.Line, intersection IntersectionPoint, c
 			endY = code.Value
 		case "Z":
 			endZ = code.Value
+		case "B":
+			endB = code.Value
 		}
 	}
+
+	// Calculate B-axis interpolation at intersection using parametric t
+	intersectionB := startB + intersection.T*(endB-startB)
 
 	var line1, line2 gcode.Line
 
 	if classification == CrossingEnter {
 		// Start above, end below: preserve intersection → end
-		line1 = gcode.Line{
-			Codes: []gcode.GCode{
-				{Letter: "G", Value: gValue}, // Use detected G value (0 or 1)
-				{Letter: "X", Value: math.Round(intersection.X*10000) / 10000}, // 4 decimal places
-				{Letter: "Y", Value: math.Round(intersection.Y*10000) / 10000},
-				{Letter: "Z", Value: math.Round(intersection.Z*10000) / 10000},
-			},
+		// Build line1 - only include coordinates that were in original line
+		codes1 := []gcode.GCode{{Letter: "G", Value: gValue}}
+
+		if hasX {
+			codes1 = append(codes1, gcode.GCode{Letter: "X", Value: math.Round(intersection.X*10000) / 10000})
 		}
-		// Only add feed rate for G1 moves (G0 rapid moves don't use feed rates)
+		if hasY {
+			codes1 = append(codes1, gcode.GCode{Letter: "Y", Value: math.Round(intersection.Y*10000) / 10000})
+		}
+		if hasZ {
+			codes1 = append(codes1, gcode.GCode{Letter: "Z", Value: math.Round(intersection.Z*10000) / 10000})
+		}
+		if hasB {
+			codes1 = append(codes1, gcode.GCode{Letter: "B", Value: math.Round(intersectionB*10000) / 10000})
+		}
+
+		line1 = gcode.Line{Codes: codes1}
 		if gValue == 1 && feedRate > 0 {
 			line1.Codes = append(line1.Codes, gcode.GCode{Letter: "F", Value: feedRate})
 		}
 
-		line2 = gcode.Line{
-			Codes: []gcode.GCode{
-				{Letter: "G", Value: gValue},
-				{Letter: "X", Value: endX},
-				{Letter: "Y", Value: endY},
-				{Letter: "Z", Value: endZ},
-			},
+		// Build line2 - move from intersection to end
+		codes2 := []gcode.GCode{{Letter: "G", Value: gValue}}
+
+		if hasX {
+			codes2 = append(codes2, gcode.GCode{Letter: "X", Value: endX})
 		}
+		if hasY {
+			codes2 = append(codes2, gcode.GCode{Letter: "Y", Value: endY})
+		}
+		if hasZ {
+			codes2 = append(codes2, gcode.GCode{Letter: "Z", Value: endZ})
+		}
+		if hasB {
+			codes2 = append(codes2, gcode.GCode{Letter: "B", Value: endB})
+		}
+
+		line2 = gcode.Line{Codes: codes2}
 		if gValue == 1 && feedRate > 0 {
 			line2.Codes = append(line2.Codes, gcode.GCode{Letter: "F", Value: feedRate})
 		}
 	} else if classification == CrossingLeave {
-		// Start below, end above: preserve start → intersection
-		line1 = gcode.Line{
-			Codes: []gcode.GCode{
-				{Letter: "G", Value: gValue},
-				{Letter: "X", Value: math.Round(intersection.X*10000) / 10000},
-				{Letter: "Y", Value: math.Round(intersection.Y*10000) / 10000},
-				{Letter: "Z", Value: math.Round(intersection.Z*10000) / 10000},
-			},
+		// Start below, end above: preserve start → intersection (discard shallow portion)
+		codes1 := []gcode.GCode{{Letter: "G", Value: gValue}}
+
+		if hasX {
+			codes1 = append(codes1, gcode.GCode{Letter: "X", Value: math.Round(intersection.X*10000) / 10000})
 		}
+		if hasY {
+			codes1 = append(codes1, gcode.GCode{Letter: "Y", Value: math.Round(intersection.Y*10000) / 10000})
+		}
+		if hasZ {
+			codes1 = append(codes1, gcode.GCode{Letter: "Z", Value: math.Round(intersection.Z*10000) / 10000})
+		}
+		if hasB {
+			codes1 = append(codes1, gcode.GCode{Letter: "B", Value: math.Round(intersectionB*10000) / 10000})
+		}
+
+		line1 = gcode.Line{Codes: codes1}
 		if gValue == 1 && feedRate > 0 {
 			line1.Codes = append(line1.Codes, gcode.GCode{Letter: "F", Value: feedRate})
 		}

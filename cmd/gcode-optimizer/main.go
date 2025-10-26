@@ -175,15 +175,23 @@ func optimizeGCodeFile(inputPath, outputPath string, allowance float64, strategy
 		linesProcessed++
 		reporter.Update(linesProcessed)
 
-		// Track start position before updating state
-		startX, startY, startZ := p.State().X, p.State().Y, p.State().Z
+		// Track start position before updating state (including B for 4-axis)
+		startX, startY, startZ, startB := p.State().X, p.State().Y, p.State().Z, p.State().B
 
 		// Update modal state
 		p.UpdateState(line)
 
-		// Check if this is a G0 or G1 move
-		if !parser.IsMove(line) {
-			// Not a G0/G1 move - preserve as-is
+		// Check if this is a G1 cutting move (ONLY optimize cutting moves, not rapid positioning)
+		isG1 := false
+		for _, code := range line.Codes {
+			if code.Letter == "G" && code.Value == 1 {
+				isG1 = true
+				break
+			}
+		}
+
+		if !isG1 {
+			// Not a G1 cutting move - preserve as-is (includes G0 rapid positioning)
 			if err := wr.WriteLine(line); err != nil {
 				return fmt.Errorf("failed to write line: %w", err)
 			}
@@ -194,7 +202,7 @@ func optimizeGCodeFile(inputPath, outputPath string, allowance float64, strategy
 		// Get end Z from current state (after update)
 		endZ := p.State().Z
 
-		// Classify the move
+		// Classify the G1 cutting move
 		classification := opt.ClassifyMove(startZ, endZ)
 
 		// Handle based on classification and strategy
@@ -232,8 +240,8 @@ func optimizeGCodeFile(inputPath, outputPath string, allowance float64, strategy
 					continue
 				}
 
-				// Split the move
-				line1, line2, err := opt.SplitMove(line, intersection, classification, startX, startY, startZ)
+				// Split the move (including B-axis for 4-axis support)
+				line1, line2, err := opt.SplitMove(line, intersection, classification, startX, startY, startZ, startB)
 				if err != nil {
 					// If can't split, preserve whole move (fallback to conservative)
 					if err := wr.WriteLine(line); err != nil {

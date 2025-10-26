@@ -74,19 +74,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.0] - 2025-10-26
 
-### Added
-- G0 rapid positioning move optimization: Tool now optimizes both G0 (rapid positioning) and G1 (linear feed) moves based on depth threshold, providing additional cycle time reduction by eliminating unnecessary rapid moves in shallow zones
+### Fixed
+- **CRITICAL**: Modal coordinate preservation - Split moves now only include coordinates that were present in the original GCode line, correctly preserving GCode modal programming semantics
+- **CRITICAL**: 4-axis (B-axis) support - B-axis coordinates are now tracked, interpolated, and preserved in split moves for rotary CNC work
+- **CRITICAL**: G0 rapid positioning - Reverted incorrect G0 optimization; G0 rapid moves are now always preserved as they position the tool and must not be removed based on depth
+- Function signature: SplitMove now accepts startB parameter for 4-axis rotary support
 
 ### Changed
-- Updated parser `ScanMinZ()` to scan both G0 and G1 commands when determining minimum Z value
-- Updated main optimization loop to process G0 moves through the same depth-based classification logic as G1 moves
-- Updated error messages to reflect "G0/G1 moves" instead of just "G1 cutting moves"
+- Only G1 cutting moves are optimized based on depth threshold (G0 rapid positioning moves always preserved)
+- Split moves preserve exact coordinate set from original line (e.g., if original has no Y, split won't add Y)
+- B-axis values interpolated at intersection point using parametric t value for correct rotary positioning
 
 ### Technical Details
-- G0 rapid moves are now subject to the same shallow/deep/crossing classification as G1 moves
-- Both conservative and aggressive strategies apply to G0 moves
-- G0 moves crossing the threshold are split using the same parametric linear interpolation as G1 moves
-- G0 moves do not use feed rates, so time savings calculation remains unchanged (G1-based only)
+- Modal programming compliance: Split segments match coordinate presence of original line
+- 4-axis rotary: B-axis linear interpolation at threshold crossing: `B_intersection = B_start + t*(B_end - B_start)`
+- G0 preservation rationale: Rapid moves position the tool; removing them based on Z depth breaks toolpath geometry
+- Coordinate tracking: hasX, hasY, hasZ, hasB flags determine which coordinates to include in split output
 
 ## [1.0.0] - 2025-10-26
 
