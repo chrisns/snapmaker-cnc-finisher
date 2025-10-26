@@ -26,12 +26,12 @@ Per plan.md, this is a single binary CLI tool:
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Create project directory structure: `cmd/gcode-optimizer/`, `internal/{parser,optimizer,writer,progress}/`, `tests/{unit,integration,integration/fixtures}/`
-- [ ] T002 Initialize Go module in go.mod with `module github.com/chrisns/snapmaker-cnc-finisher`
-- [ ] T003 [P] Add dependency `github.com/256dpi/gcode v0.3.0` to go.mod
-- [ ] T004 [P] Create README.md with basic project description and installation instructions
-- [ ] T005 [P] Create .gitignore with Go-specific entries (vendor/, *.exe, *.test, coverage.out)
-- [ ] T006 [P] Create test fixtures directory and add freya-subset.cnc (first 1000 lines of freya.cnc for fast tests)
+- [X] T001 Create project directory structure: `cmd/gcode-optimizer/`, `internal/{parser,optimizer,writer,progress}/`, `tests/{unit,integration,integration/fixtures}/`
+- [X] T002 Initialize Go module in go.mod with `module github.com/chrisns/snapmaker-cnc-finisher`
+- [X] T003 [P] Add dependency `github.com/256dpi/gcode v0.3.0` to go.mod
+- [X] T004 [P] Create README.md with basic project description and installation instructions
+- [X] T005 [P] Create .gitignore with Go-specific entries (vendor/, *.exe, *.test, coverage.out)
+- [X] T006 [P] Create test fixtures directory and add freya-subset.cnc (first 1000 lines of freya.cnc for fast tests)
 
 ---
 
@@ -41,12 +41,12 @@ Per plan.md, this is a single binary CLI tool:
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T007 Implement HeaderMetadata struct in internal/parser/parser.go with all fields from data-model.md
-- [ ] T008 Implement ModalState struct in internal/parser/parser.go with X, Y, Z, B, F fields
-- [ ] T009 [P] Implement MoveClassification enum (Shallow, Deep, CrossingEnter, CrossingLeave, NonCutting) in internal/optimizer/optimizer.go
-- [ ] T010 [P] Implement OptimizationStrategy enum (Conservative, Aggressive) in internal/optimizer/optimizer.go
-- [ ] T011 [P] Implement IntersectionPoint struct in internal/optimizer/optimizer.go
-- [ ] T012 [P] Implement OptimizationResult struct in internal/progress/progress.go
+- [X] T007 Implement HeaderMetadata struct in internal/parser/parser.go with all fields from data-model.md
+- [X] T008 Implement ModalState struct in internal/parser/parser.go with X, Y, Z, B, F fields
+- [X] T009 [P] Implement MoveClassification enum (Shallow, Deep, CrossingEnter, CrossingLeave, NonCutting) in internal/optimizer/optimizer.go
+- [X] T010 [P] Implement OptimizationStrategy enum (Conservative, Aggressive) in internal/optimizer/optimizer.go
+- [X] T011 [P] Implement IntersectionPoint struct in internal/optimizer/optimizer.go
+- [X] T012 [P] Implement OptimizationResult struct in internal/progress/progress.go
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -62,17 +62,17 @@ Per plan.md, this is a single binary CLI tool:
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T013 [P] [US1] Unit test for header parsing in tests/unit/parser_test.go - verify HeaderMetadata extraction from Snapmaker Luban header
-- [ ] T014 [P] [US1] Unit test for modal state initialization in tests/unit/parser_test.go - verify Z initialized from max_z, X/Y/B default to 0
-- [ ] T015 [P] [US1] Unit test for modal state updates in tests/unit/parser_test.go - verify coordinates update only when specified, others persist
-- [ ] T016 [P] [US1] Unit test for ScanMinZ in tests/unit/parser_test.go - verify deepest Z value found in G1 commands
-- [ ] T017 [P] [US1] Unit test for ClassifyMove in tests/unit/optimizer_test.go - table-driven tests for Shallow, Deep, CrossingEnter, CrossingLeave classifications
-- [ ] T018 [P] [US1] Unit test for CalculateIntersection in tests/unit/move_test.go - verify parametric interpolation accuracy, edge cases (horizontal move, division by zero)
-- [ ] T019 [P] [US1] Unit test for SplitMove (aggressive) in tests/unit/move_test.go - verify correct G1 commands generated, feed rate preserved, 3-4 decimal precision
-- [ ] T020 [P] [US1] Unit test for ShouldPreserve (conservative vs aggressive) in tests/unit/optimizer_test.go - verify strategy-specific behavior
-- [ ] T021 [P] [US1] Integration test for end-to-end optimization (aggressive strategy) in tests/integration/cli_test.go - verify file with crossing moves produces correct output
-- [ ] T022 [P] [US1] Integration test for end-to-end optimization (conservative strategy) in tests/integration/cli_test.go - verify crossing moves preserved entirely
-- [ ] T023 [P] [US1] Integration test for 3-axis vs 4-axis detection in tests/integration/cli_test.go - verify is_rotate header flag handling
+- [X] T013 [P] [US1] Unit test for header parsing in tests/unit/parser_test.go - verify HeaderMetadata extraction from Snapmaker Luban header
+- [X] T014 [P] [US1] Unit test for modal state initialization in tests/unit/parser_test.go - verify Z initialized from max_z, X/Y/B default to 0
+- [X] T015 [P] [US1] Unit test for modal state updates in tests/unit/parser_test.go - verify coordinates update only when specified, others persist
+- [X] T016 [P] [US1] Unit test for ScanMinZ in tests/unit/parser_test.go - verify deepest Z value found in G1 commands
+- [X] T017 [P] [US1] Unit test for ClassifyMove in tests/unit/optimizer_test.go - table-driven tests for Shallow, Deep, CrossingEnter, CrossingLeave classifications
+- [X] T018 [P] [US1] Unit test for CalculateIntersection in tests/unit/move_test.go - verify parametric interpolation accuracy, edge cases (horizontal move, division by zero)
+- [X] T019 [P] [US1] Unit test for SplitMove (aggressive) in tests/unit/move_test.go - verify correct G1 commands generated, feed rate preserved, 3-4 decimal precision
+- [X] T020 [P] [US1] Unit test for ShouldPreserve (conservative vs aggressive) in tests/unit/optimizer_test.go - verify strategy-specific behavior
+- [X] T021 [P] [US1] Integration test for end-to-end optimization (aggressive strategy) in tests/integration/cli_test.go - verify file with crossing moves produces correct output
+- [X] T022 [P] [US1] Integration test for end-to-end optimization (conservative strategy) in tests/integration/cli_test.go - verify crossing moves preserved entirely
+- [X] T023 [P] [US1] Integration test for 3-axis vs 4-axis detection in tests/integration/cli_test.go - verify is_rotate header flag handling
 
 ### Implementation for User Story 1
 
