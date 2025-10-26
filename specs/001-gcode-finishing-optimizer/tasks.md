@@ -76,22 +76,22 @@ Per plan.md, this is a single binary CLI tool:
 
 ### Implementation for User Story 1
 
-- [ ] T024 [P] [US1] Implement ParseFile function in internal/parser/parser.go to parse GCode file from io.Reader using gcode.ParseFile
-- [ ] T025 [P] [US1] Implement parseHeader function in internal/parser/parser.go to extract HeaderMetadata from comment lines (;key: value format)
-- [ ] T026 [US1] Implement Parser.ResetState in internal/parser/parser.go to initialize ModalState from HeaderMetadata (Z from max_z, others 0)
-- [ ] T027 [US1] Implement Parser.UpdateState in internal/parser/parser.go to update ModalState from gcode.Line based on X/Y/Z/B/F codes present
-- [ ] T028 [US1] Implement Parser.ScanMinZ in internal/parser/parser.go to find minimum Z value across all G1 commands in file
-- [ ] T029 [P] [US1] Implement NewOptimizer function in internal/optimizer/optimizer.go with minZ, allowance, strategy parameters
-- [ ] T030 [US1] Implement Optimizer.ClassifyMove in internal/optimizer/optimizer.go using startZ, endZ comparison to threshold
-- [ ] T031 [US1] Implement Optimizer.CalculateIntersection in internal/optimizer/optimizer.go using parametric linear interpolation formula from data-model.md
-- [ ] T032 [US1] Implement Optimizer.ShouldPreserve in internal/optimizer/optimizer.go returning true/false based on classification and strategy
-- [ ] T033 [US1] Implement Optimizer.SplitMove in internal/optimizer/optimizer.go to generate two gcode.Line structs at intersection point with correct coordinates and feed rate
-- [ ] T034 [P] [US1] Implement Writer.WriteFile in internal/writer/writer.go to output gcode.File using gcode.WriteFile, preserving header
-- [ ] T035 [US1] Implement main CLI entry point in cmd/gcode-optimizer/main.go with flag parsing (input, allowance, output, --force, --strategy)
-- [ ] T036 [US1] Implement input validation in cmd/gcode-optimizer/main.go - file existence, allowance numeric/non-negative, strategy enum check
-- [ ] T037 [US1] Implement optimization pipeline in cmd/gcode-optimizer/main.go: parse → scan min_z → calculate threshold → classify/filter moves → write output
-- [ ] T038 [US1] Add output file overwrite confirmation prompt in cmd/gcode-optimizer/main.go (skip if --force flag present)
-- [ ] T039 [US1] Add console message displaying detected min_z and calculated threshold per FR-004
+- [X] T024 [P] [US1] Implement ParseFile function in internal/parser/parser.go to parse GCode file from io.Reader using gcode.ParseFile
+- [X] T025 [P] [US1] Implement parseHeader function in internal/parser/parser.go to extract HeaderMetadata from comment lines (;key: value format)
+- [X] T026 [US1] Implement Parser.ResetState in internal/parser/parser.go to initialize ModalState from HeaderMetadata (Z from max_z, others 0)
+- [X] T027 [US1] Implement Parser.UpdateState in internal/parser/parser.go to update ModalState from gcode.Line based on X/Y/Z/B/F codes present
+- [X] T028 [US1] Implement Parser.ScanMinZ in internal/parser/parser.go to find minimum Z value across all G1 commands in file
+- [X] T029 [P] [US1] Implement NewOptimizer function in internal/optimizer/optimizer.go with minZ, allowance, strategy parameters
+- [X] T030 [US1] Implement Optimizer.ClassifyMove in internal/optimizer/optimizer.go using startZ, endZ comparison to threshold
+- [X] T031 [US1] Implement Optimizer.CalculateIntersection in internal/optimizer/optimizer.go using parametric linear interpolation formula from data-model.md
+- [X] T032 [US1] Implement Optimizer.ShouldPreserve in internal/optimizer/optimizer.go returning true/false based on classification and strategy
+- [X] T033 [US1] Implement Optimizer.SplitMove in internal/optimizer/optimizer.go to generate two gcode.Line structs at intersection point with correct coordinates and feed rate
+- [X] T034 [P] [US1] Implement Writer.WriteFile in internal/writer/writer.go to output gcode.File using gcode.WriteFile, preserving header
+- [X] T035 [US1] Implement main CLI entry point in cmd/gcode-optimizer/main.go with flag parsing (input, allowance, output, --force, --strategy)
+- [X] T036 [US1] Implement input validation in cmd/gcode-optimizer/main.go - file existence, allowance numeric/non-negative, strategy enum check
+- [X] T037 [US1] Implement optimization pipeline in cmd/gcode-optimizer/main.go: parse → scan min_z → calculate threshold → classify/filter moves → write output
+- [X] T038 [US1] Add output file overwrite confirmation prompt in cmd/gcode-optimizer/main.go (skip if --force flag present)
+- [X] T039 [US1] Add console message displaying detected min_z and calculated threshold per FR-004
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently - basic optimization works with both strategies
 
@@ -105,24 +105,24 @@ Per plan.md, this is a single binary CLI tool:
 
 ### Tests for User Story 2 (TDD - MANDATORY) ⚠️
 
-- [ ] T040 [P] [US2] Unit test for ProgressReporter.Update in tests/unit/progress_test.go - verify update frequency (2s OR 10k lines criteria)
-- [ ] T041 [P] [US2] Unit test for ETA calculation in tests/unit/progress_test.go - verify formula: (elapsed / processed) × (total - processed)
-- [ ] T042 [P] [US2] Unit test for OptimizationResult calculations in tests/unit/progress_test.go - verify reduction %, time savings, lines/sec
-- [ ] T043 [P] [US2] Integration test for progress display in tests/integration/cli_test.go - verify console updates during processing of large file
+- [X] T040 [P] [US2] Unit test for ProgressReporter.Update in tests/unit/progress_test.go - verify update frequency (2s OR 10k lines criteria)
+- [X] T041 [P] [US2] Unit test for ETA calculation in tests/unit/progress_test.go - verify formula: (elapsed / processed) × (total - processed)
+- [X] T042 [P] [US2] Unit test for OptimizationResult calculations in tests/unit/progress_test.go - verify reduction %, time savings, lines/sec
+- [X] T043 [P] [US2] Integration test for progress display in tests/integration/cli_test.go - verify console updates during processing of large file
 
 ### Implementation for User Story 2
 
-- [ ] T044 [P] [US2] Implement ProgressReporter struct in internal/progress/progress.go with totalLines, processedLines, startTime, lastUpdate fields
-- [ ] T045 [US2] Implement Reporter.Update in internal/progress/progress.go to display progress if 2s elapsed OR 10k lines processed since last update
-- [ ] T046 [US2] Implement ETA calculation in Reporter.Update using formula from research.md
-- [ ] T047 [US2] Implement Reporter.Finish in internal/progress/progress.go to display final progress line
-- [ ] T048 [P] [US2] Implement ResultFormatter.Format in internal/progress/progress.go to generate formatted statistics string per data-model.md display format
-- [ ] T049 [US2] Implement ResultFormatter.Display in internal/progress/progress.go to print formatted result to stdout
-- [ ] T050 [US2] Integrate ProgressReporter into optimization pipeline in cmd/gcode-optimizer/main.go - initialize with totalLines from header
-- [ ] T051 [US2] Call Reporter.Update after processing each line in cmd/gcode-optimizer/main.go
-- [ ] T052 [US2] Calculate OptimizationResult statistics in cmd/gcode-optimizer/main.go: lines removed/preserved/split, file sizes, reduction %, time savings
-- [ ] T053 [US2] Implement time savings calculation in cmd/gcode-optimizer/main.go: sum (distance / feed_rate) for each removed G1 move
-- [ ] T054 [US2] Display final results using ResultFormatter.Display after optimization completes
+- [X] T044 [P] [US2] Implement ProgressReporter struct in internal/progress/progress.go with totalLines, processedLines, startTime, lastUpdate fields
+- [X] T045 [US2] Implement Reporter.Update in internal/progress/progress.go to display progress if 2s elapsed OR 10k lines processed since last update
+- [X] T046 [US2] Implement ETA calculation in Reporter.Update using formula from research.md
+- [X] T047 [US2] Implement Reporter.Finish in internal/progress/progress.go to display final progress line
+- [X] T048 [P] [US2] Implement ResultFormatter.Format in internal/progress/progress.go to generate formatted statistics string per data-model.md display format
+- [X] T049 [US2] Implement ResultFormatter.Display in internal/progress/progress.go to print formatted result to stdout
+- [X] T050 [US2] Integrate ProgressReporter into optimization pipeline in cmd/gcode-optimizer/main.go - initialize with totalLines from header
+- [X] T051 [US2] Call Reporter.Update after processing each line in cmd/gcode-optimizer/main.go
+- [X] T052 [US2] Calculate OptimizationResult statistics in cmd/gcode-optimizer/main.go: lines removed/preserved/split, file sizes, reduction %, time savings
+- [X] T053 [US2] Implement time savings calculation in cmd/gcode-optimizer/main.go: sum (distance / feed_rate) for each removed G1 move
+- [X] T054 [US2] Display final results using ResultFormatter.Display after optimization completes
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently - optimization works with visible progress
 
@@ -136,25 +136,25 @@ Per plan.md, this is a single binary CLI tool:
 
 ### Tests for User Story 3 (TDD - MANDATORY) ⚠️
 
-- [ ] T055 [P] [US3] Integration test for non-existent input file in tests/integration/cli_test.go - verify error message and exit code
-- [ ] T056 [P] [US3] Integration test for invalid allowance (negative) in tests/integration/cli_test.go - verify error message format
-- [ ] T057 [P] [US3] Integration test for invalid allowance (non-numeric) in tests/integration/cli_test.go - verify error message
-- [ ] T058 [P] [US3] Integration test for invalid --strategy flag in tests/integration/cli_test.go - verify error lists valid options
-- [ ] T059 [P] [US3] Integration test for missing Snapmaker header in tests/integration/cli_test.go - verify warning issued but processing continues
-- [ ] T060 [P] [US3] Integration test for unparseable file in tests/integration/cli_test.go - verify parse error message
+- [X] T055 [P] [US3] Integration test for non-existent input file in tests/integration/cli_test.go - verify error message and exit code
+- [X] T056 [P] [US3] Integration test for invalid allowance (negative) in tests/integration/cli_test.go - verify error message format
+- [X] T057 [P] [US3] Integration test for invalid allowance (non-numeric) in tests/integration/cli_test.go - verify error message
+- [X] T058 [P] [US3] Integration test for invalid --strategy flag in tests/integration/cli_test.go - verify error lists valid options
+- [X] T059 [P] [US3] Integration test for missing Snapmaker header in tests/integration/cli_test.go - verify warning issued but processing continues
+- [X] T060 [P] [US3] Integration test for unparseable file in tests/integration/cli_test.go - verify parse error message
 
 ### Implementation for User Story 3
 
-- [ ] T061 [US3] Implement file existence check in cmd/gcode-optimizer/main.go before parsing - error: "Error: Input file not found: <path>"
-- [ ] T062 [US3] Implement allowance validation in cmd/gcode-optimizer/main.go using strconv.ParseFloat, check >= 0 - error: "Error: Allowance must be a non-negative number, got: <value>"
-- [ ] T063 [US3] Implement strategy validation in cmd/gcode-optimizer/main.go - error: "Invalid strategy '<value>'. Valid options are: conservative, aggressive" (exact format per spec clarification #4)
-- [ ] T064 [US3] Add header validation warning in internal/parser/parser.go - check for ";tool_head" containing "CNC", add to warnings list if missing
-- [ ] T065 [US3] Implement Parser.Warnings method in internal/parser/parser.go to return accumulated warning messages
-- [ ] T066 [US3] Display parser warnings to console in cmd/gcode-optimizer/main.go after successful parse
-- [ ] T067 [US3] Add error handling for gcode.ParseFile failures in internal/parser/parser.go - wrap error: "failed to parse GCode file: %w"
-- [ ] T068 [US3] Add error handling for file I/O failures in internal/writer/writer.go - wrap errors with context
-- [ ] T069 [US3] Ensure all error messages to stderr use fmt.Fprintf(os.Stderr, ...) in cmd/gcode-optimizer/main.go
-- [ ] T070 [US3] Ensure tool exits with code 1 on all errors in cmd/gcode-optimizer/main.go using os.Exit(1)
+- [X] T061 [US3] Implement file existence check in cmd/gcode-optimizer/main.go before parsing - error: "Error: Input file not found: <path>"
+- [X] T062 [US3] Implement allowance validation in cmd/gcode-optimizer/main.go using strconv.ParseFloat, check >= 0 - error: "Error: Allowance must be a non-negative number, got: <value>"
+- [X] T063 [US3] Implement strategy validation in cmd/gcode-optimizer/main.go - error: "Invalid strategy '<value>'. Valid options are: conservative, aggressive" (exact format per spec clarification #4)
+- [X] T064 [US3] Add header validation warning in internal/parser/parser.go - check for ";tool_head" containing "CNC", add to warnings list if missing
+- [X] T065 [US3] Implement Parser.Warnings method in internal/parser/parser.go to return accumulated warning messages
+- [X] T066 [US3] Display parser warnings to console in cmd/gcode-optimizer/main.go after successful parse
+- [X] T067 [US3] Add error handling for gcode.ParseFile failures in internal/parser/parser.go - wrap error: "failed to parse GCode file: %w"
+- [X] T068 [US3] Add error handling for file I/O failures in internal/writer/writer.go - wrap errors with context
+- [X] T069 [US3] Ensure all error messages to stderr use fmt.Fprintf(os.Stderr, ...) in cmd/gcode-optimizer/main.go
+- [X] T070 [US3] Ensure tool exits with code 1 on all errors in cmd/gcode-optimizer/main.go using os.Exit(1)
 
 **Checkpoint**: All user stories should now be independently functional - optimization with progress and comprehensive error handling
 
@@ -164,25 +164,25 @@ Per plan.md, this is a single binary CLI tool:
 
 **Purpose**: Improvements that affect multiple user stories, CI/CD, and documentation
 
-- [ ] T071 [P] Create GitHub Actions workflow .github/workflows/ci.yml for lint, test (matrix: macos-latest, ubuntu-latest, windows-latest)
-- [ ] T072 [P] Create GitHub Actions workflow .github/workflows/release.yml for multi-arch builds (darwin/amd64, darwin/arm64, windows/amd64, linux/amd64)
-- [ ] T073 [P] Add build configuration in Makefile or build script with CGO_ENABLED=0, -ldflags="-s -w", -trimpath flags
-- [ ] T074 [P] Update README.md with usage examples from quickstart.md, installation instructions, troubleshooting
-- [ ] T075 [P] Add --version flag support in cmd/gcode-optimizer/main.go to display version number
-- [ ] T076 [P] Add --help flag support in cmd/gcode-optimizer/main.go with usage, examples, flag descriptions
-- [ ] T077 [P] Run gofmt on all .go files in project
-- [ ] T078 [P] Run go vet ./... and fix any issues
-- [ ] T079 [P] Run go test -cover ./... and verify >= 80% coverage per constitution
-- [ ] T080 [P] Add additional unit tests if coverage < 80% in tests/unit/
-- [ ] T081 [P] Create test fixture simple-3axis.cnc in tests/integration/fixtures/ for basic 3-axis test case
-- [ ] T082 [P] Create test fixture 4axis-rotary.cnc in tests/integration/fixtures/ with B rotation for 4-axis test
-- [ ] T083 [P] Create test fixture threshold-crossing.cnc in tests/integration/fixtures/ with moves crossing threshold
-- [ ] T084 Manual smoke test on macOS: build binary, run on freya.cnc, verify output
-- [ ] T085 Manual smoke test on Linux: build binary, run on freya.cnc, verify output
-- [ ] T086 Manual smoke test on Windows: build binary, run on freya.cnc, verify output
-- [ ] T087 [P] Performance test with 10M line file in tests/integration/performance_test.go - verify memory usage <2GB, processing completes without crash, meets SC-006
-- [ ] T088 Create CHANGELOG.md for v1.0.0 release documenting initial features
-- [ ] T089 Create LICENSE file (MIT license per plan.md)
+- [X] T071 [P] Create GitHub Actions workflow .github/workflows/ci.yml for lint, test (matrix: macos-latest, ubuntu-latest, windows-latest)
+- [X] T072 [P] Create GitHub Actions workflow .github/workflows/release.yml for multi-arch builds (darwin/amd64, darwin/arm64, windows/amd64, linux/amd64)
+- [X] T073 [P] Add build configuration in Makefile or build script with CGO_ENABLED=0, -ldflags="-s -w", -trimpath flags
+- [X] T074 [P] Update README.md with usage examples from quickstart.md, installation instructions, troubleshooting
+- [X] T075 [P] Add --version flag support in cmd/gcode-optimizer/main.go to display version number
+- [X] T076 [P] Add --help flag support in cmd/gcode-optimizer/main.go with usage, examples, flag descriptions
+- [X] T077 [P] Run gofmt on all .go files in project
+- [X] T078 [P] Run go vet ./... and fix any issues
+- [X] T079 [P] Run go test -cover ./... and verify >= 80% coverage per constitution
+- [X] T080 [P] Add additional unit tests if coverage < 80% in tests/unit/
+- [X] T081 [P] Create test fixture simple-3axis.cnc in tests/integration/fixtures/ for basic 3-axis test case
+- [X] T082 [P] Create test fixture 4axis-rotary.cnc in tests/integration/fixtures/ with B rotation for 4-axis test
+- [X] T083 [P] Create test fixture threshold-crossing.cnc in tests/integration/fixtures/ with moves crossing threshold
+- [X] T084 Manual smoke test on macOS: build binary, run on freya.cnc, verify output
+- [X] T085 Manual smoke test on Linux: build binary, run on freya.cnc, verify output
+- [X] T086 Manual smoke test on Windows: build binary, run on freya.cnc, verify output
+- [X] T087 [P] Performance test with 10M line file in tests/integration/performance_test.go - verify memory usage <2GB, processing completes without crash, meets SC-006
+- [X] T088 Create CHANGELOG.md for v1.0.0 release documenting initial features
+- [X] T089 Create LICENSE file (MIT license per plan.md)
 - [ ] T090 Tag v1.0.0 release in git after all tests pass
 - [ ] T091 Verify GitHub Actions release workflow creates binaries for all 4 target platforms
 - [ ] T092 Create GitHub release with changelog and binary attachments
