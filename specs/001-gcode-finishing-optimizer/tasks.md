@@ -272,8 +272,8 @@ Every exported function/type requires:
 
 ### Release Preparation
 
-- [ ] T091 Tag v1.0.0 release, trigger GitHub Actions release workflow
-- [ ] T092 Verify multi-arch binaries build successfully (darwin/amd64, darwin/arm64, windows/amd64, linux/amd64)
+- [X] T091 Tag v1.0.0 release, trigger GitHub Actions release workflow
+- [X] T092 Verify multi-arch binaries build successfully (darwin/amd64, darwin/arm64, windows/amd64, linux/amd64)
 - [ ] T093 Test downloaded binaries on each platform (smoke test)
 - [ ] T094 Publish release notes with CHANGELOG, link to binaries
 
